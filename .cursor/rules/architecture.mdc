@@ -1,0 +1,6 @@
+﻿---
+description: Reglas principales y arquitectura de RenfeTracker
+globs: ["**/*"]
+alwaysApply: true
+---
+Lee y cumple estrictamente todas las especificaciones, reglas de modularidad y entorno definidas en el archivo @AGENTS.md en la raíz del repositorio.
