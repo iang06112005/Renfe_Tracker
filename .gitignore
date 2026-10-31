@@ -1,0 +1,16 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# IDEs
+.vscode/
+.idea/
