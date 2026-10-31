@@ -87,3 +87,45 @@ Estructura real de un elemento en `entity[]`:
   }
 
 }
+
+---
+description: Reglas de arquitectura y datos para el visualizador GPS de Renfe
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Contexto del Proyecto: Renfe Live GPS Tracker
+
+## 1. Fuente de Datos (Renfe Open Data GTFS-RT)
+Renfe expone JSONs públicos sin autenticación:
+- Cercanías: `https://gtfsrt.renfe.com/vehicle_positions.json`
+- AVE / Larga / Media Distancia: `https://gtfsrt.renfe.com/vehicle_positions_LD.json`
+
+Estructura de cada elemento dentro de `entity[]` en el JSON de Renfe:
+`json
+{
+  "id": "VP_C1_23514",
+  "vehicle": {
+    "trip": { "tripId": "23514..." },
+    "position": { "latitude": 40.4067, "longitude": -3.6908 },
+    "currentStatus": "IN_TRANSIT_TO",
+    "timestamp": 1730372000,
+    "stopId": "18000",
+    "vehicle": { "id": "23514", "label": "C1-23514-PLATF.(2)" }
+  }
+}
+`
+
+## 2. Reglas de Arquitectura
+- **PROHIBIDO hacer fetch a `gtfsrt.renfe.com` desde el frontend** (falla por CORS y expone al cliente).
+- **Backend (FastAPI en `/backend`):**
+  - Debe unificar o servir por parámetro (`?type=cercanias|ld|all`) los datos transformados a formato **GeoJSON (`FeatureCollection`)** para pintarlos directamente en el mapa.
+  - **Caché obligatoria:** Guardar en memoria la respuesta durante 15 segundos. Aunque el frontend haga polling cada 5s, el backend solo consulta a Renfe máximo 1 vez cada 15s.
+  - Extraer la línea comercial (ej. `C1`, `C5`, `AVE`) y el andén parseando `vehicle.vehicle.label` con regex (`r"PLATF\.\((\w+)\)"`).
+- **Frontend (Vite + React + TypeScript + MapLibre GL JS en `/frontend`):**
+  - Usar un `GeoJSONSource` en MapLibre para actualizar las posiciones de golpe sin recrear marcadores DOM individuales (rendimiento fluido con +300 trenes simultáneos).
+  - Mapa base oscuro (`https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json`).
+
+## 3. Estilo de Código
+- Tipado estricto en Python (Pydantic) y TypeScript (interfaces claras, nada de `any`).
+- Código modular: separar cliente HTTP/caché (`renfe_client.py`) de las rutas (`main.py`).
