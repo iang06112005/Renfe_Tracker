@@ -25,6 +25,7 @@ from metro_vehicles import MetroUnavailable, MetroVehicleStore
 from parser import parse_feed
 from renfe_client import RenfeClient, RenfeUnavailable
 from trip_info import lookup as lookup_trip
+from trip_updates import TripUpdateInfo, enrich_with_trip_update, parse_trip_updates
 from schemas import (
     FeatureCollection,
     FeedType,
@@ -228,10 +229,20 @@ async def _features(client: RenfeClient, kind: RenfeKind) -> list[TrainFeature] 
     except RenfeUnavailable:
         logger.warning("Sin datos de Renfe para %s", kind)
         return None
-    return [_with_trip_context(feature) for feature in parse_feed(payload, kind).features]
+    updates = await _trip_updates(client, kind)
+    return [_with_trip_context(feature, updates) for feature in parse_feed(payload, kind).features]
 
 
-def _with_trip_context(feature: TrainFeature) -> TrainFeature:
+async def _trip_updates(client: RenfeClient, kind: RenfeKind) -> dict[str, TripUpdateInfo]:
+    try:
+        payload = await client.fetch_trip_updates(kind)
+    except RenfeUnavailable:
+        logger.warning("Sin trip updates de Renfe para %s", kind)
+        return {}
+    return parse_trip_updates(payload)
+
+
+def _with_trip_context(feature: TrainFeature, updates: dict[str, TripUpdateInfo]) -> TrainFeature:
     extra = lookup_trip(
         feature.properties.service,
         feature.properties.tripId,
@@ -239,9 +250,17 @@ def _with_trip_context(feature: TrainFeature) -> TrainFeature:
         feature.properties.status,
         feature.properties.line,
     )
-    if not extra:
+    trip_id = feature.properties.tripId
+    update = updates.get(trip_id) if trip_id else None
+    merged = enrich_with_trip_update(
+        extra,
+        stop_id=feature.properties.stopId,
+        status=feature.properties.status,
+        update=update,
+    )
+    if not merged:
         return feature
-    return feature.model_copy(update={"properties": feature.properties.model_copy(update=extra)})
+    return feature.model_copy(update={"properties": feature.properties.model_copy(update=merged)})
 
 
 def _safe_asset(full_path: str) -> Path | None:

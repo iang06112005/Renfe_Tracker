@@ -24,6 +24,9 @@ export interface TrainProperties {
   previousStop: string | null
   nextStop: string | null
   currentStop: string | null
+  delaySeconds: number | null
+  delayLabel: string | null
+  predictionsLabel: string | null
 }
 
 export interface TrainFeature {

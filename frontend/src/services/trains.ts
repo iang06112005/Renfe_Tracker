@@ -83,6 +83,9 @@ function readProperties(record: Record<string, unknown>, id: string, service: Se
     previousStop: readString(record.previousStop),
     nextStop: readString(record.nextStop),
     currentStop: readString(record.currentStop),
+    delaySeconds: typeof record.delaySeconds === "number" ? record.delaySeconds : null,
+    delayLabel: readString(record.delayLabel),
+    predictionsLabel: readString(record.predictionsLabel),
   }
 }
 

@@ -90,6 +90,7 @@ function Detail({ properties, status }: { properties: TrainFeature["properties"]
     ["Producto", properties.product && properties.product !== properties.line ? properties.product : null],
     ["Núcleo", nucleusText(properties.nucleus, properties.nucleusLabel)],
     ["Recorrido", cleanText(properties.route)],
+    ["Retraso", properties.delayLabel],
     ["Anterior", cleanStopField(properties.previousStop)],
     ["En parada", cleanStopField(properties.currentStop)],
     ["Siguiente", cleanStopField(properties.nextStop)],
@@ -97,6 +98,7 @@ function Detail({ properties, status }: { properties: TrainFeature["properties"]
     ["Andén", properties.platform],
     ["Estado", status === "Sin estado" ? null : status],
     ["Posición", formatTimestamp(properties.timestamp)],
+    ["Horarios", properties.predictionsLabel],
   ].filter((row): row is [string, string] => typeof row[1] === "string" && row[1] !== "—")
   if (rows.length === 0) return null
   return (

@@ -115,14 +115,24 @@ def describe_train(
     following = calls[index + 1][1] if index + 1 < len(calls) else None
     if status == "STOPPED_AT":
         _put_stop(fields, "currentStop", current, current.departure or current.arrival)
+        if "currentStop" in fields:
+            fields["_currentStopId"] = stop_id
         if following is not None:
             _put_stop(fields, "nextStop", following, None)
+            if "nextStop" in fields:
+                fields["_nextStopId"] = calls[index + 1][0]
         if previous is not None:
             _put_stop(fields, "previousStop", previous, None)
+            if "previousStop" in fields:
+                fields["_previousStopId"] = calls[index - 1][0]
     elif status in {"IN_TRANSIT_TO", "INCOMING_AT"}:
         _put_stop(fields, "nextStop", current, current.arrival or current.departure)
+        if "nextStop" in fields:
+            fields["_nextStopId"] = stop_id
         if previous is not None:
             _put_stop(fields, "previousStop", previous, None)
+            if "previousStop" in fields:
+                fields["_previousStopId"] = calls[index - 1][0]
     return fields
 
 

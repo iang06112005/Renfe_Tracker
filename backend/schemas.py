@@ -134,6 +134,9 @@ class TrainProperties(BaseModel):
     previousStop: str | None = None
     nextStop: str | None = None
     currentStop: str | None = None
+    delaySeconds: int | None = None
+    delayLabel: str | None = None
+    predictionsLabel: str | None = None
 
 
 class TrainFeature(BaseModel):
