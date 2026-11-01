@@ -6,6 +6,7 @@ import { LoginGate } from "./components/LoginGate"
 import { MapView } from "./components/MapView"
 import { TrainPopup } from "./components/TrainPopup"
 import { useSession } from "./hooks/useSession"
+import { useRouteLines } from "./hooks/useRouteLines"
 import { useTrainInterpolation } from "./hooks/useTrainInterpolation"
 import { useTrainsData } from "./hooks/useTrainsData"
 import type { FeatureCollection, FeedType } from "./types/trains"
@@ -30,6 +31,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { data, error, updatedAt, loading } = useTrainsData(feed, onUnauthorized)
+  const routeLines = useRouteLines(feed, onUnauthorized)
   const visible = useMemo(() => applyLineFilter(data, hiddenLines), [data, hiddenLines])
   const frame = useTrainInterpolation(visible)
   const selected = frame.features.find((feature) => feature.properties.id === selectedId) ?? null
@@ -54,7 +56,14 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
 
   return (
     <div className="app">
-      <MapView geojson={frame} selectedId={selectedId} onSelect={setSelectedId} onReady={setMap} />
+      <MapView
+        geojson={frame}
+        routeLines={routeLines.data}
+        hiddenLines={hiddenLines}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onReady={setMap}
+      />
       <TrainPopup map={map} train={selected} onClose={closePopup} />
       <FilterSidebar
         feed={feed}
@@ -69,6 +78,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
         updatedAt={updatedAt}
         loading={loading}
         error={error}
+        linesError={routeLines.error}
         onLogout={onLogout}
       />
     </div>

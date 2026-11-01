@@ -20,6 +20,7 @@ from config import (
     SESSION_MESSAGE,
     require_password,
 )
+from gtfs_shapes import ShapeLoadError, ShapeStore
 from parser import parse_feed
 from renfe_client import RenfeClient, RenfeUnavailable
 from schemas import (
@@ -44,10 +45,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     require_password()
     client = RenfeClient()
     await client.open()
+    shapes = ShapeStore()
     app.state.renfe = client
+    app.state.shapes = shapes
+    app.state.shapes_task = asyncio.create_task(shapes.ensure_loaded())
     try:
         yield
     finally:
+        app.state.shapes_task.cancel()
         await client.aclose()
 
 
@@ -150,6 +155,27 @@ async def trains(
 ) -> FeatureCollection:
     client: RenfeClient = request.app.state.renfe
     return await _load_trains(client, feed)
+
+
+@app.get("/api/lines", response_class=GeoJSONResponse)
+async def lines(
+    request: Request,
+    feed: FeedType = Query(default="all", alias="type"),
+) -> Response:
+    await _wait_for_shapes(request)
+    store: ShapeStore = request.app.state.shapes
+    return Response(content=store.body(feed), media_type="application/geo+json")
+
+
+async def _wait_for_shapes(request: Request) -> None:
+    task: asyncio.Task[None] = request.app.state.shapes_task
+    if task.done() and not task.cancelled() and task.exception() is not None:
+        task = asyncio.create_task(request.app.state.shapes.ensure_loaded())
+        request.app.state.shapes_task = task
+    try:
+        await task
+    except (ShapeLoadError, OSError) as exc:
+        raise HTTPException(status_code=502, detail="No se han podido cargar los trazados") from exc
 
 
 async def _load_trains(client: RenfeClient, feed: FeedType) -> FeatureCollection:

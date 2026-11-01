@@ -147,3 +147,30 @@ class SessionResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
+
+
+class LineStringGeometry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["LineString"] = "LineString"
+    coordinates: list[tuple[float, float]]
+
+
+class RouteLineProperties(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    line: str | None = None
+    color: str
+    service: ServiceKind
+    shapeId: str
+
+
+class RouteLineFeature(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["Feature"] = "Feature"
+    geometry: LineStringGeometry
+    properties: RouteLineProperties
+
+
+class RouteLineCollection(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[RouteLineFeature]

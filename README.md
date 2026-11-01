@@ -6,6 +6,8 @@ La contraseña es de grupo, no hay cuentas. Se lee de `RENFE_TRACKER_PASSWORD` (
 
 El feed de Cercanías incluye también Rodalies. AVE, Media Distancia y Larga Distancia llegan juntos en el feed de larga distancia: Renfe no separa ahí el producto comercial, así que el mapa tampoco lo inventa.
 
+Debajo de los trenes hay dos capas de vía. OpenRailwayMap (teselas, directamente en el navegador) dibuja la infraestructura. Las líneas de color salen del GTFS estático de Cercanías (`shapes.txt` en `https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip`): el backend lo convierte a GeoJSON una vez y lo cachea 24 h. El zip de larga distancia (`https://ssl.renfe.com/gtransit/Fichero_AV_LD/google_transit.zip`) no trae `shapes.txt`, así que esas relaciones no se dibujan como corredor de color; siguen viéndose las vías de OpenRailwayMap.
+
 ## Arranque en local (Windows + conda)
 
 Entorno: Miniforge, conda `renfe_tracker`. No instales las dependencias en el Python del sistema.

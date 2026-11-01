@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from "react"
 import maplibregl, { GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl"
 
+import type { RouteLineCollection } from "../types/lines"
 import type { FeatureCollection } from "../types/trains"
 
 const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+const RAIL_TILES = ["https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png"]
+const RAIL_SOURCE = "openrailwaymap"
+const RAIL_LAYER = "openrailwaymap"
+const ROUTE_SOURCE = "route-lines"
+const ROUTE_CASING = "route-lines-casing"
+const ROUTE_LAYER = "route-lines"
 const SOURCE_ID = "trains"
 const HIT_LAYER = "trains-hit"
 const CIRCLE_LAYER = "trains-circles"
@@ -12,12 +19,14 @@ const LABEL_LAYER = "trains-labels"
 
 interface MapViewProps {
   geojson: FeatureCollection
+  routeLines: RouteLineCollection
+  hiddenLines: ReadonlySet<string>
   selectedId: string | null
   onSelect: (id: string | null) => void
   onReady: (map: MapLibreMap | null) => void
 }
 
-export function MapView({ geojson, selectedId, onSelect, onReady }: MapViewProps) {
+export function MapView({ geojson, routeLines, hiddenLines, selectedId, onSelect, onReady }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onSelect)
@@ -52,6 +61,8 @@ export function MapView({ geojson, selectedId, onSelect, onReady }: MapViewProps
 
     map.on("load", () => {
       if (cancelled) return
+      addRailNetwork(map)
+      addRouteLines(map)
       map.addSource(SOURCE_ID, { type: "geojson", data: geojsonRef.current })
       map.addLayer({
         id: HIT_LAYER,
@@ -141,9 +152,72 @@ export function MapView({ geojson, selectedId, onSelect, onReady }: MapViewProps
 
   useEffect(() => {
     const map = mapRef.current
+    if (!map || !ready) return
+    const source = map.getSource(ROUTE_SOURCE)
+    if (source instanceof GeoJSONSource) source.setData(visibleRouteLines(routeLines, hiddenLines))
+  }, [routeLines, hiddenLines, ready])
+
+  useEffect(() => {
+    const map = mapRef.current
     if (!map || !ready || !map.getLayer(HIGHLIGHT_LAYER)) return
     map.setFilter(HIGHLIGHT_LAYER, ["==", ["get", "id"], selectedId ?? ""])
   }, [selectedId, ready])
 
   return <div ref={containerRef} className="map" />
+}
+
+function addRailNetwork(map: MapLibreMap) {
+  map.addSource(RAIL_SOURCE, {
+    type: "raster",
+    tiles: RAIL_TILES,
+    tileSize: 256,
+    maxzoom: 19,
+    attribution: "© OpenRailwayMap (CC-BY-SA), © OpenStreetMap",
+  })
+  map.addLayer({
+    id: RAIL_LAYER,
+    type: "raster",
+    source: RAIL_SOURCE,
+    paint: { "raster-opacity": 0.95, "raster-fade-duration": 0 },
+  })
+}
+
+function addRouteLines(map: MapLibreMap) {
+  map.addSource(ROUTE_SOURCE, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  })
+  map.addLayer({
+    id: ROUTE_CASING,
+    type: "line",
+    source: ROUTE_SOURCE,
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: {
+      "line-color": "#0c0d0b",
+      "line-opacity": 0.8,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2.4, 10, 6],
+    },
+  })
+  map.addLayer({
+    id: ROUTE_LAYER,
+    type: "line",
+    source: ROUTE_SOURCE,
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: {
+      "line-color": ["coalesce", ["get", "color"], "#f3efe4"],
+      "line-opacity": 0.92,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.2, 10, 3.2],
+    },
+  })
+}
+
+function visibleRouteLines(collection: RouteLineCollection, hidden: ReadonlySet<string>): RouteLineCollection {
+  if (hidden.size === 0) return collection
+  return {
+    type: "FeatureCollection",
+    features: collection.features.filter((feature) => {
+      const line = feature.properties.line
+      return line == null || !hidden.has(line)
+    }),
+  }
 }

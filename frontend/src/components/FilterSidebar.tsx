@@ -16,6 +16,7 @@ interface FilterSidebarProps {
   updatedAt: number | null
   loading: boolean
   error: string | null
+  linesError: string | null
   onLogout: () => void
 }
 
@@ -38,6 +39,7 @@ export function FilterSidebar({
   updatedAt,
   loading,
   error,
+  linesError,
   onLogout,
 }: FilterSidebarProps) {
   const [now, setNow] = useState(() => Date.now())
@@ -75,6 +77,9 @@ export function FilterSidebar({
       </p>
       <p className="meta">{serviceSummary(cercaniasCount, ldCount)}</p>
       <p className="meta">{formatAge(updatedAt, now)}</p>
+      {!loading && !error && updatedAt !== null && visibleCount === 0 ? (
+        <p className="hint">Renfe responde, pero ahora mismo no publica ninguna posición.</p>
+      ) : null}
       {feed !== "cercanias" ? (
         <p className="hint">AVE, Media y Larga Distancia comparten el feed de larga distancia.</p>
       ) : null}
@@ -107,6 +112,9 @@ export function FilterSidebar({
           </div>
         </div>
       ) : null}
+
+      <p className="hint">Líneas de color: trazado GTFS. OpenRailwayMap muestra el resto de vías.</p>
+      {linesError ? <p className="hint">{linesError}</p> : null}
 
       <ul className="legend">
         <li>
