@@ -97,7 +97,7 @@ export function MapView({
         type: "circle",
         source: SOURCE_ID,
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 4.5, 3.2, 8, 5, 12, 7],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 4.5, 4, 8, 5.4, 12, 7.2],
           "circle-color": [
             "coalesce",
             ["get", "groupColor"],
@@ -249,9 +249,9 @@ function addRouteLines(map: MapLibreMap) {
     source: ROUTE_SOURCE,
     layout: { "line-join": "round", "line-cap": "round" },
     paint: {
-      "line-color": "#f7f5f0",
-      "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.35, 11, 0.85, 14, 0.95],
-      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.9, 10, 2.2, 13, 4.2, 15, 6.4],
+      "line-color": "#ffffff",
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 9, 0, 11, 0.75, 14, 0.9],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2.6, 13, 4.2, 15, 6.2],
     },
   })
   map.addLayer({
@@ -261,8 +261,8 @@ function addRouteLines(map: MapLibreMap) {
     layout: { "line-join": "round", "line-cap": "round" },
     paint: {
       "line-color": ["coalesce", ["get", "color"], "#5c6570"],
-      "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.62, 10, 0.9, 14, 0.96],
-      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.7, 10, 1.8, 13, 3.1, 15, 4.6],
+      "line-opacity": 0.95,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.35, 8, 1.9, 12, 3, 15, 4.6],
     },
   })
 }

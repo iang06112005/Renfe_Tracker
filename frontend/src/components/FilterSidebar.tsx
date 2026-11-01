@@ -250,6 +250,7 @@ function GroupFilters({
               type="button"
               aria-pressed={shown}
               className="chip group-chip"
+              style={{ borderColor: group.color }}
               onClick={() => onToggle(group.id)}
             >
               <span className="swatch" style={{ background: group.color }} />

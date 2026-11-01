@@ -54,7 +54,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
     () => (metro ? shapeLines(routeLines.data) : uniqueLines(data)),
     [metro, routeLines.data, data],
   )
-  const lineColors = useMemo(() => (metro ? shapeColors(routeLines.data) : {}), [metro, routeLines.data])
+  const lineColors = useMemo(() => shapeColors(routeLines.data, metro), [metro, routeLines.data])
   const counts = useMemo(() => countServices(data), [data])
   const closePopup = useCallback(() => setSelectedId(null), [])
 
@@ -215,13 +215,20 @@ function shapeLines(data: RouteLineCollection): string[] {
   return [...lines].sort((a, b) => a.localeCompare(b, "es", { numeric: true }))
 }
 
-function shapeColors(data: RouteLineCollection): Record<string, string> {
-  const colors: Record<string, string> = {}
+function shapeColors(data: RouteLineCollection, allowMixed: boolean): Record<string, string> {
+  const seen = new Map<string, Set<string>>()
   for (const feature of data.features) {
     const line = feature.properties.line
-    if (line && !colors[line]) colors[line] = feature.properties.color
+    if (!line) continue
+    const colors = seen.get(line) ?? new Set<string>()
+    colors.add(feature.properties.color)
+    seen.set(line, colors)
   }
-  return colors
+  const result: Record<string, string> = {}
+  for (const [line, colors] of seen) {
+    if (allowMixed || colors.size === 1) result[line] = [...colors][0]
+  }
+  return result
 }
 
 function countServices(data: FeatureCollection | null): { cercanias: number; ld: number } {
