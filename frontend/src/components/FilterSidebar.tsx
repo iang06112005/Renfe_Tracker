@@ -115,14 +115,15 @@ export function FilterSidebar({
       ) : null}
 
       <p className="count">
-        <strong>{network === "metro" ? "—" : loading && visibleCount === 0 ? "…" : visibleCount}</strong>
-        <span>{network === "metro" ? "sin posiciones en vivo" : visibleCount === 1 ? "tren en el mapa" : "trenes en el mapa"}</span>
+        <strong>{loading && visibleCount === 0 ? "…" : visibleCount}</strong>
+        <span>{visibleCount === 1 ? "tren en el mapa" : "trenes en el mapa"}</span>
       </p>
       {network === "renfe" ? <p className="meta">{serviceSummary(cercaniasCount, ldCount)}</p> : null}
-      {network === "renfe" ? <p className="meta">{formatAge(updatedAt, now)}</p> : null}
+      {network === "metro" ? <p className="meta">Posición estimada por tiempos de llegada</p> : null}
+      <p className="meta">{formatAge(updatedAt, now)}</p>
       {network === "metro" ? (
         <p className="hint">
-          Metro de Madrid no publica posiciones en abierto. Líneas y estaciones: CRTM.{" "}
+          Trenes estimados con los teleindicadores de Metro de Madrid. Líneas y estaciones: CRTM.{" "}
           <a href="https://www.transportes.gob.es/" target="_blank" rel="noreferrer">
             Powered by MITRAMS
           </a>
@@ -131,6 +132,9 @@ export function FilterSidebar({
       ) : null}
       {network === "renfe" && !loading && !error && updatedAt !== null && visibleCount === 0 ? (
         <p className="hint">Renfe responde, pero ahora mismo no publica ninguna posición.</p>
+      ) : null}
+      {network === "metro" && !loading && !error && updatedAt !== null && visibleCount === 0 ? (
+        <p className="hint">No hay llegadas recientes para estimar trenes ahora mismo.</p>
       ) : null}
       {network === "renfe" && feed !== "cercanias" && products.length === 0 ? (
         <p className="hint">Alta velocidad, media y larga distancia comparten un feed. Cada una lleva su etiqueta.</p>
@@ -195,17 +199,15 @@ export function FilterSidebar({
 
       <p className="hint">
         {network === "metro"
-          ? "Cada línea lleva el color publicado por el CRTM. Las estaciones son los puntos blancos."
+          ? "Cada punto es un tren aproximado entre estaciones. Colores y trazados: CRTM."
           : "Núcleos y servicios coloreados. En Madrid cada C lleva su color. Las estaciones aparecen al acercar."}
       </p>
       {linesError ? <p className="hint">{linesError}</p> : null}
 
-      {network === "renfe" ? (
       <button type="button" className="detail-toggle" aria-pressed={detailed} onClick={onToggleDetail}>
         <span>Detalle del tren</span>
         <span>{detailed ? "Sí" : "No"}</span>
       </button>
-      ) : null}
 
       <button type="button" className="logout" onClick={onLogout}>
         Salir

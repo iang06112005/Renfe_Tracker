@@ -7,18 +7,18 @@ from typing import Any
 import httpx
 
 from config import CERCANIAS_URL, CACHE_TTL_SECONDS, HTTP_TIMEOUT_SECONDS, LD_URL, USER_AGENT
-from schemas import ServiceKind
+from schemas import RenfeKind
 
 logger = logging.getLogger("renfe_tracker.client")
 
-FEED_URLS: dict[ServiceKind, str] = {
+FEED_URLS: dict[RenfeKind, str] = {
     "cercanias": CERCANIAS_URL,
     "ld": LD_URL,
 }
 
 
 class RenfeUnavailable(Exception):
-    def __init__(self, kind: ServiceKind) -> None:
+    def __init__(self, kind: RenfeKind) -> None:
         super().__init__(kind)
         self.kind = kind
 
@@ -35,9 +35,9 @@ class RenfeClient:
         self._client = client
         self._owns_client = client is None
         self._clock = clock or time.monotonic
-        self._cache: dict[ServiceKind, dict[str, Any]] = {}
-        self._fetched_at: dict[ServiceKind, float] = {}
-        self._inflight: dict[ServiceKind, asyncio.Task[dict[str, Any]]] = {}
+        self._cache: dict[RenfeKind, dict[str, Any]] = {}
+        self._fetched_at: dict[RenfeKind, float] = {}
+        self._inflight: dict[RenfeKind, asyncio.Task[dict[str, Any]]] = {}
         self._lock = asyncio.Lock()
 
     async def open(self) -> None:
@@ -53,7 +53,7 @@ class RenfeClient:
             await self._client.aclose()
             self._client = None
 
-    async def fetch_feed(self, kind: ServiceKind) -> dict[str, Any]:
+    async def fetch_feed(self, kind: RenfeKind) -> dict[str, Any]:
         reserved = await self._reserve(kind)
         if not isinstance(reserved, asyncio.Task):
             return reserved
@@ -70,7 +70,7 @@ class RenfeClient:
         await self._remember(kind, reserved, payload)
         return payload
 
-    async def _reserve(self, kind: ServiceKind) -> dict[str, Any] | asyncio.Task[dict[str, Any]]:
+    async def _reserve(self, kind: RenfeKind) -> dict[str, Any] | asyncio.Task[dict[str, Any]]:
         async with self._lock:
             if self._within_ttl(kind):
                 cached = self._cache.get(kind)
@@ -85,7 +85,7 @@ class RenfeClient:
 
     async def _remember(
         self,
-        kind: ServiceKind,
+        kind: RenfeKind,
         task: asyncio.Task[dict[str, Any]],
         payload: dict[str, Any] | None,
     ) -> None:
@@ -96,11 +96,11 @@ class RenfeClient:
             if payload is not None:
                 self._cache[kind] = payload
 
-    def _within_ttl(self, kind: ServiceKind) -> bool:
+    def _within_ttl(self, kind: RenfeKind) -> bool:
         fetched = self._fetched_at.get(kind)
         return fetched is not None and self._clock() - fetched < self._ttl
 
-    async def _download(self, kind: ServiceKind) -> dict[str, Any]:
+    async def _download(self, kind: RenfeKind) -> dict[str, Any]:
         if self._client is None:
             raise RuntimeError("RenfeClient no está abierto")
         response = await self._client.get(FEED_URLS[kind])

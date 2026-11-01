@@ -39,7 +39,8 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   const [detailed, setDetailed] = useState(true)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const metro = network === "metro"
-  const { data, error, updatedAt, loading } = useTrainsData(feed, onUnauthorized, !metro)
+  const trainFeed = metro ? "metro" : feed
+  const { data, error, updatedAt, loading } = useTrainsData(trainFeed, onUnauthorized, true)
   const routeLines = useRouteLines(metro ? "metro" : feed, onUnauthorized)
   const stations = useStations(metro ? "metro" : feed, onUnauthorized)
   const visible = useMemo(
@@ -86,7 +87,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   return (
     <div className="app">
       <MapView
-        geojson={metro ? { type: "FeatureCollection", features: [] } : frame}
+        geojson={frame}
         routeLines={routeLines.data}
         stations={stations.data}
         hiddenNuclei={hiddenNuclei}

@@ -21,6 +21,7 @@ from config import (
     require_password,
 )
 from gtfs_shapes import ShapeLoadError, ShapeStore
+from metro_vehicles import MetroUnavailable, MetroVehicleStore
 from parser import parse_feed
 from renfe_client import RenfeClient, RenfeUnavailable
 from trip_info import lookup as lookup_trip
@@ -29,7 +30,7 @@ from schemas import (
     FeedType,
     HealthResponse,
     LoginRequest,
-    ServiceKind,
+    RenfeKind,
     SessionResponse,
     TrainFeature,
 )
@@ -46,14 +47,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     require_password()
     client = RenfeClient()
     await client.open()
+    metro = MetroVehicleStore()
+    await metro.open()
     shapes = ShapeStore()
     app.state.renfe = client
+    app.state.metro = metro
     app.state.shapes = shapes
     app.state.shapes_task = asyncio.create_task(shapes.ensure_loaded())
     try:
         yield
     finally:
         app.state.shapes_task.cancel()
+        await metro.aclose()
         await client.aclose()
 
 
@@ -154,6 +159,12 @@ async def trains(
     request: Request,
     feed: FeedType = Query(default="all", alias="type"),
 ) -> FeatureCollection:
+    if feed == "metro":
+        metro: MetroVehicleStore = request.app.state.metro
+        try:
+            return await metro.vehicles()
+        except MetroUnavailable as exc:
+            raise HTTPException(status_code=502, detail="Metro no responde") from exc
     client: RenfeClient = request.app.state.renfe
     return await _load_trains(client, feed)
 
@@ -197,7 +208,13 @@ async def _wait_for_shapes(request: Request) -> None:
 
 
 async def _load_trains(client: RenfeClient, feed: FeedType) -> FeatureCollection:
-    kinds: tuple[ServiceKind, ...] = ("cercanias", "ld") if feed == "all" else (feed,)
+    kinds: tuple[RenfeKind, ...]
+    if feed == "all":
+        kinds = ("cercanias", "ld")
+    elif feed in {"cercanias", "ld"}:
+        kinds = (feed,)
+    else:
+        raise HTTPException(status_code=422, detail="tipo de feed desconocido")
     parts = await asyncio.gather(*(_features(client, kind) for kind in kinds))
     if all(part is None for part in parts):
         raise HTTPException(status_code=502, detail="Renfe no responde")
@@ -205,7 +222,7 @@ async def _load_trains(client: RenfeClient, feed: FeedType) -> FeatureCollection
     return FeatureCollection(features=features)
 
 
-async def _features(client: RenfeClient, kind: ServiceKind) -> list[TrainFeature] | None:
+async def _features(client: RenfeClient, kind: RenfeKind) -> list[TrainFeature] | None:
     try:
         payload = await client.fetch_feed(kind)
     except RenfeUnavailable:

@@ -1,5 +1,5 @@
-export type FeedType = "cercanias" | "ld" | "all"
-export type ServiceKind = "cercanias" | "ld"
+export type FeedType = "cercanias" | "ld" | "all" | "metro"
+export type ServiceKind = "cercanias" | "ld" | "metro"
 
 export interface TrainProperties {
   id: string
@@ -43,6 +43,7 @@ export interface FeatureCollection {
 export const SERVICE_LABEL: Record<ServiceKind, string> = {
   cercanias: "Cercanías",
   ld: "Alta, media y larga",
+  metro: "Metro Madrid",
 }
 
 export const EMPTY_COLLECTION: FeatureCollection = {

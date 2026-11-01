@@ -50,7 +50,7 @@ function parseFeature(value: unknown): TrainFeature | null {
   const [lon, lat] = coordinates
   if (typeof lon !== "number" || typeof lat !== "number") return null
   const service = value.properties.service
-  if (service !== "cercanias" && service !== "ld") return null
+  if (service !== "cercanias" && service !== "ld" && service !== "metro") return null
   if (typeof value.properties.id !== "string") return null
   return {
     type: "Feature",

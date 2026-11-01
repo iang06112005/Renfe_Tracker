@@ -21,11 +21,11 @@ from config import (
     USER_AGENT,
 )
 from parser import extract_line
-from schemas import ServiceKind
+from schemas import RenfeKind
 
 logger = logging.getLogger("renfe_tracker.shapes")
 
-GTFS_FEEDS: dict[ServiceKind, str] = {
+GTFS_FEEDS: dict[RenfeKind, str] = {
     "cercanias": CERCANIAS_GTFS_URL,
     "ld": LD_GTFS_URL,
 }
@@ -110,7 +110,7 @@ def _route_line_bodies() -> dict[str, bytes]:
     return _encode(collections)
 
 
-def collection_from_zip(blob: bytes, service: ServiceKind) -> tuple[dict[str, Any] | None, str | None]:
+def collection_from_zip(blob: bytes, service: RenfeKind) -> tuple[dict[str, Any] | None, str | None]:
     try:
         with zipfile.ZipFile(io.BytesIO(blob)) as archive:
             return _collection_from_archive(archive, service)
@@ -120,7 +120,7 @@ def collection_from_zip(blob: bytes, service: ServiceKind) -> tuple[dict[str, An
 
 def _collection_from_archive(
     archive: zipfile.ZipFile,
-    service: ServiceKind,
+    service: RenfeKind,
 ) -> tuple[dict[str, Any] | None, str | None]:
     if "shapes.txt" not in archive.namelist():
         return None, "el zip no incluye shapes.txt"

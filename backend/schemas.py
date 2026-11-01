@@ -2,8 +2,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-ServiceKind = Literal["cercanias", "ld"]
-FeedType = Literal["cercanias", "ld", "all"]
+ServiceKind = Literal["cercanias", "ld", "metro"]
+RenfeKind = Literal["cercanias", "ld"]
+FeedType = Literal["cercanias", "ld", "all", "metro"]
 
 
 def optional_str(value: object) -> str | None:
