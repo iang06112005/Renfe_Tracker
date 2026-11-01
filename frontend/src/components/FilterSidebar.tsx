@@ -142,43 +142,6 @@ export function FilterSidebar({
         </p>
       ) : null}
 
-      {lines.length > 0 ? (
-        <div className="lines">
-          <div className="lines-head">
-            <h2>Líneas</h2>
-            {hiddenLines.size > 0 ? (
-              <button type="button" className="text-button" onClick={onShowAllLines}>
-                Mostrar todas
-              </button>
-            ) : null}
-          </div>
-          <div className="chips">
-            {lines.map((line) => {
-              const hidden = hiddenLines.has(line)
-              return (
-                <button
-                  key={line}
-                  type="button"
-                  aria-pressed={!hidden}
-                  className={lineColors[line] ? "chip group-chip" : "chip"}
-                  onClick={() => onToggleLine(line)}
-                >
-                  {lineColors[line] ? <span className="swatch" style={{ background: lineColors[line] }} /> : null}
-                  {line}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      <p className="hint">
-        {network === "metro"
-          ? "Cada línea lleva el color publicado por el CRTM. Las estaciones son los puntos blancos."
-          : "Líneas de color: trazado GTFS. Las estaciones aparecen al acercar el mapa. OpenRailwayMap queda muy tenue."}
-      </p>
-      {linesError ? <p className="hint">{linesError}</p> : null}
-
       {network === "renfe" && nuclei.length > 0 ? (
         <GroupFilters
           title="Núcleos"
@@ -198,11 +161,44 @@ export function FilterSidebar({
         />
       ) : null}
 
-      {network === "renfe" ? (
-        <p className="hint">
-          Madrid lleva el color de cada línea. Los demás núcleos, uno por ciudad. Las vías siguen en segundo plano.
-        </p>
+      {lines.length > 0 ? (
+        <div className="lines">
+          <div className="lines-head">
+            <h2>Líneas</h2>
+            {hiddenLines.size > 0 ? (
+              <button type="button" className="text-button" onClick={onShowAllLines}>
+                Mostrar todas
+              </button>
+            ) : null}
+          </div>
+          <div className="chips">
+            {lines.map((line) => {
+              const hidden = hiddenLines.has(line)
+              const color = lineColors[line]
+              return (
+                <button
+                  key={line}
+                  type="button"
+                  aria-pressed={!hidden}
+                  className={color ? "chip group-chip" : "chip"}
+                  style={color ? { borderColor: color } : undefined}
+                  onClick={() => onToggleLine(line)}
+                >
+                  {color ? <span className="swatch" style={{ background: color }} /> : null}
+                  {line}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       ) : null}
+
+      <p className="hint">
+        {network === "metro"
+          ? "Cada línea lleva el color publicado por el CRTM. Las estaciones son los puntos blancos."
+          : "Núcleos y servicios coloreados. En Madrid cada C lleva su color. Las estaciones aparecen al acercar."}
+      </p>
+      {linesError ? <p className="hint">{linesError}</p> : null}
 
       {network === "renfe" ? (
       <button type="button" className="detail-toggle" aria-pressed={detailed} onClick={onToggleDetail}>

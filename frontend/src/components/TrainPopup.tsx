@@ -70,8 +70,13 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
         ×
       </button>
       {detailed && train.properties.bucketLabel ? (
-        <p className="popup-kicker" style={{ color: train.properties.bucketColor ?? undefined }}>
-          {train.properties.bucketLabel}
+        <p
+          className="popup-kicker"
+          style={{ color: train.properties.nucleusColor ?? train.properties.bucketColor ?? undefined }}
+        >
+          {train.properties.nucleusLabel
+            ? `${train.properties.bucketLabel} · ${train.properties.nucleusLabel}`
+            : train.properties.bucketLabel}
         </p>
       ) : null}
       <h2>{title}</h2>
@@ -82,7 +87,7 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
 
 function Detail({ properties, status }: { properties: TrainFeature["properties"]; status: string }) {
   const rows = [
-    ["Producto", properties.bucket ? properties.product : null],
+    ["Producto", properties.product && properties.product !== properties.line ? properties.product : null],
     ["Núcleo", nucleusText(properties.nucleus, properties.nucleusLabel)],
     ["Recorrido", properties.route],
     ["Anterior", properties.previousStop],

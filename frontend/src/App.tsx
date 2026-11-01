@@ -216,17 +216,26 @@ function shapeLines(data: RouteLineCollection): string[] {
 }
 
 function shapeColors(data: RouteLineCollection, allowMixed: boolean): Record<string, string> {
-  const seen = new Map<string, Set<string>>()
+  const madrid = new Map<string, string>()
+  const counts = new Map<string, Map<string, number>>()
   for (const feature of data.features) {
     const line = feature.properties.line
     if (!line) continue
-    const colors = seen.get(line) ?? new Set<string>()
-    colors.add(feature.properties.color)
-    seen.set(line, colors)
+    const color = feature.properties.color
+    if (feature.properties.shapeId.startsWith("10_")) madrid.set(line, color)
+    const tallies = counts.get(line) ?? new Map<string, number>()
+    tallies.set(color, (tallies.get(color) ?? 0) + 1)
+    counts.set(line, tallies)
   }
   const result: Record<string, string> = {}
-  for (const [line, colors] of seen) {
-    if (allowMixed || colors.size === 1) result[line] = [...colors][0]
+  for (const [line, tallies] of counts) {
+    if (madrid.has(line)) {
+      result[line] = madrid.get(line)!
+      continue
+    }
+    if (allowMixed || tallies.size === 1) {
+      result[line] = [...tallies.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    }
   }
   return result
 }
