@@ -6,6 +6,8 @@ import logging
 import time
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +48,11 @@ class ShapeStore:
         async with _GUARD:
             if self._bodies is not None:
                 return
-            self._bodies = await asyncio.to_thread(load_route_lines)
+            try:
+                self._bodies = await asyncio.to_thread(load_route_lines)
+            except Exception:
+                logger.exception("GTFS estático no disponible; el mapa arranca sin trazados")
+                self._bodies = _encode({})
 
     def body(self, feed: str) -> bytes:
         if self._bodies is None:
@@ -69,22 +75,44 @@ def load_route_lines() -> dict[str, bytes]:
         raise ShapeLoadError("No se han podido cargar los trazados")
     for note in skipped:
         logger.info("Trazado omitido: %s", note)
-    _write_cache({"version": CACHE_VERSION, "skipped": skipped, "collections": collections})
+    try:
+        _write_cache({"version": CACHE_VERSION, "skipped": skipped, "collections": collections})
+    except OSError:
+        logger.warning("No se pudo guardar la caché de trazados", exc_info=True)
     return _encode(collections)
 
 
 def collection_from_zip(blob: bytes, service: ServiceKind) -> tuple[dict[str, Any] | None, str | None]:
     try:
         with zipfile.ZipFile(io.BytesIO(blob)) as archive:
-            names = set(archive.namelist())
-            if "shapes.txt" not in names:
-                return None, "el zip no incluye shapes.txt"
-            routes = _routes(archive.read("routes.txt"))
-            chosen = _choose_lines(archive.read("trips.txt"), routes)
-            features = _line_features(archive.read("shapes.txt"), chosen, service)
+            return _collection_from_archive(archive, service)
     except (zipfile.BadZipFile, KeyError) as exc:
         return None, f"GTFS ilegible ({exc.__class__.__name__})"
+
+
+def _collection_from_archive(
+    archive: zipfile.ZipFile,
+    service: ServiceKind,
+) -> tuple[dict[str, Any] | None, str | None]:
+    if "shapes.txt" not in archive.namelist():
+        return None, "el zip no incluye shapes.txt"
+    with _member(archive, "routes.txt") as routes_file:
+        routes = _routes(_rows(routes_file))
+    with _member(archive, "trips.txt") as trips_file:
+        chosen = _choose_lines(_rows(trips_file), routes)
+    with _member(archive, "shapes.txt") as shapes_file:
+        features = _line_features(_rows(shapes_file), chosen, service)
     return {"type": "FeatureCollection", "features": features}, None
+
+
+@contextmanager
+def _member(archive: zipfile.ZipFile, name: str) -> Iterator[io.TextIOBase]:
+    raw = archive.open(name)
+    text = io.TextIOWrapper(raw, encoding="utf-8-sig", newline="")
+    try:
+        yield text
+    finally:
+        text.close()
 
 
 def _collections_from_disk_or_network() -> tuple[dict[str, dict[str, Any]], list[str], bool]:
@@ -93,13 +121,17 @@ def _collections_from_disk_or_network() -> tuple[dict[str, dict[str, Any]], list
     failed = False
     for service, url in GTFS_FEEDS.items():
         try:
-            blob = _zip_bytes(service, url)
+            archive = _open_feed_zip(service, url)
         except (httpx.HTTPError, OSError) as exc:
             failed = True
             skipped.append(f"{service}: no se pudo descargar el GTFS ({exc.__class__.__name__})")
             collections[service] = _empty()
             continue
-        collection, reason = collection_from_zip(blob, service)
+        with archive:
+            try:
+                collection, reason = _collection_from_archive(archive, service)
+            except (zipfile.BadZipFile, KeyError) as exc:
+                collection, reason = None, f"GTFS ilegible ({exc.__class__.__name__})"
         if reason:
             skipped.append(f"{service}: {reason}")
             collections[service] = _empty()
@@ -108,19 +140,17 @@ def _collections_from_disk_or_network() -> tuple[dict[str, dict[str, Any]], list
     return collections, skipped, failed
 
 
-def _zip_bytes(service: str, url: str) -> bytes:
+def _open_feed_zip(service: str, url: str) -> zipfile.ZipFile:
     GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     path = GTFS_CACHE_DIR / f"{service}.zip"
-    if _fresh(path):
-        return path.read_bytes()
-    try:
-        _download(url, path)
-    except (httpx.HTTPError, OSError):
-        if path.is_file():
+    if not _fresh(path):
+        try:
+            _download(url, path)
+        except (httpx.HTTPError, OSError):
+            if not path.is_file():
+                raise
             logger.warning("Se reutiliza el zip antiguo de %s", service)
-            return path.read_bytes()
-        raise
-    return path.read_bytes()
+    return zipfile.ZipFile(path)
 
 
 def _download(url: str, path: Path) -> None:
@@ -136,9 +166,9 @@ def _download(url: str, path: Path) -> None:
     temporary.replace(path)
 
 
-def _routes(raw: bytes) -> dict[str, tuple[str | None, str | None]]:
+def _routes(rows: Any) -> dict[str, tuple[str | None, str | None]]:
     indexed: dict[str, tuple[str | None, str | None]] = {}
-    for row in _rows(raw):
+    for row in rows:
         route_id = row.get("route_id") or ""
         if not route_id:
             continue
@@ -147,13 +177,13 @@ def _routes(raw: bytes) -> dict[str, tuple[str | None, str | None]]:
 
 
 def _choose_lines(
-    raw: bytes,
+    rows: Any,
     routes: dict[str, tuple[str | None, str | None]],
 ) -> dict[str, tuple[str | None, str]]:
     votes: dict[str, Counter[str]] = defaultdict(Counter)
     colors: dict[tuple[str, str], str] = {}
     seen: set[str] = set()
-    for row in _rows(raw):
+    for row in rows:
         shape_id = row.get("shape_id") or ""
         if not shape_id:
             continue
@@ -175,9 +205,13 @@ def _choose_lines(
     return chosen
 
 
-def _line_features(raw: bytes, chosen: dict[str, tuple[str | None, str]], service: ServiceKind) -> list[dict[str, Any]]:
+def _line_features(
+    rows: Any,
+    chosen: dict[str, tuple[str | None, str]],
+    service: ServiceKind,
+) -> list[dict[str, Any]]:
     grouped: dict[str, list[tuple[int, float, float]]] = defaultdict(list)
-    for row in _rows(raw):
+    for row in rows:
         shape_id = row.get("shape_id") or ""
         point = _point(row)
         if not shape_id or point is None or shape_id not in chosen:
@@ -211,9 +245,8 @@ def _point(row: dict[str, str]) -> tuple[int, float, float] | None:
     return sequence, round(lon, 6), round(lat, 6)
 
 
-def _rows(raw: bytes):
-    text = raw.decode("utf-8-sig")
-    reader = csv.reader(io.StringIO(text))
+def _rows(text: io.TextIOBase):
+    reader = csv.reader(text)
     try:
         headers = [cell.strip() for cell in next(reader)]
     except StopIteration:

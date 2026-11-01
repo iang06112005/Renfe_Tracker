@@ -1,6 +1,8 @@
 import io
 import zipfile
 
+import pytest
+
 from gtfs_shapes import collection_from_zip
 from schemas import RouteLineFeature
 
@@ -27,6 +29,21 @@ def test_padded_gtfs_headers_still_parse() -> None:
     assert collection["features"][0]["properties"]["line"] == "C4"
 
 
+def test_stop_times_is_not_opened(monkeypatch: pytest.MonkeyPatch) -> None:
+    opened: list[str] = []
+    real_open = zipfile.ZipFile.open
+
+    def open_member(self: zipfile.ZipFile, name: str, *args: object, **kwargs: object) -> object:
+        opened.append(name)
+        return real_open(self, name, *args, **kwargs)
+
+    monkeypatch.setattr(zipfile.ZipFile, "open", open_member)
+    collection, reason = collection_from_zip(_zip(with_shapes=True), "cercanias")
+    assert reason is None
+    assert collection is not None
+    assert "stop_times.txt" not in opened
+
+
 def test_feed_without_shapes_is_skipped() -> None:
     collection, reason = collection_from_zip(_zip(with_shapes=False), "ld")
     assert collection is None
@@ -47,6 +64,7 @@ def _zip(*, with_shapes: bool, padded: bool = False) -> bytes:
             "trips.txt",
             f"route_id,trip_id,shape_id{pad}\n10,1003S19799{short},{shape}{pad}\n",
         )
+        archive.writestr("stop_times.txt", "trip_id,stop_id\n" + ("1,2\n" * 1000))
         if with_shapes:
             archive.writestr(
                 "shapes.txt",

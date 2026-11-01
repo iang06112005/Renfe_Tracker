@@ -1,4 +1,5 @@
 import os
+import threading
 from pathlib import Path
 
 import httpx
@@ -27,6 +28,46 @@ def test_password_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RENFE_TRACKER_PASSWORD", raising=False)
     with pytest.raises(RuntimeError, match="RENFE_TRACKER_PASSWORD"):
         require_password()
+
+
+def test_gtfs_failure_keeps_health_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    def explode() -> dict[str, bytes]:
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr("gtfs_shapes.load_route_lines", explode)
+    with TestClient(app) as client:
+        assert client.get("/api/health").status_code == 200
+        client.post("/api/login", json={"password": os.environ["RENFE_TRACKER_PASSWORD"]})
+        lines = client.get("/api/lines")
+        assert lines.status_code == 200
+        assert lines.json() == {"type": "FeatureCollection", "features": []}
+
+
+def test_boot_does_not_wait_for_gtfs(monkeypatch: pytest.MonkeyPatch) -> None:
+    release = threading.Event()
+
+    def slow() -> dict[str, bytes]:
+        release.wait(15)
+        from gtfs_shapes import _encode
+
+        return _encode({})
+
+    monkeypatch.setattr("gtfs_shapes.load_route_lines", slow)
+    holder: dict[str, int] = {}
+
+    def run() -> None:
+        try:
+            with TestClient(app) as client:
+                holder["code"] = client.get("/api/health").status_code
+        finally:
+            release.set()
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(5)
+    release.set()
+    assert holder.get("code") == 200
+    thread.join(5)
 
 
 def test_secure_cookie_when_proxy_is_https() -> None:
