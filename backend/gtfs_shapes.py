@@ -42,17 +42,29 @@ class ShapeStore:
     def __init__(self) -> None:
         self._bodies: dict[str, bytes] | None = None
         self._extra: dict[str, bytes] | None = None
+        self._retry_after = 0.0
 
     async def ensure_loaded(self) -> None:
-        if self._bodies is not None and self._extra is not None:
+        if self._has_line_features() and self._extra is not None:
+            return
+        if self._bodies is not None and self._extra is not None and time.monotonic() < self._retry_after:
             return
         async with _GUARD:
-            if self._bodies is None:
+            if self._has_line_features() and self._extra is not None:
+                return
+            if self._bodies is not None and self._extra is not None and time.monotonic() < self._retry_after:
+                return
+            if not self._has_line_features():
                 try:
                     self._bodies = await asyncio.to_thread(load_route_lines)
                 except Exception:
                     logger.exception("GTFS estático no disponible; el mapa arranca sin trazados")
                     self._bodies = _encode({})
+                if not self._has_line_features():
+                    self._retry_after = time.monotonic() + 60.0
+                    logger.warning("Trazados vacíos; se reintentará en 60 s")
+                else:
+                    self._retry_after = 0.0
             if self._extra is None:
                 try:
                     from transit_layers import load_transit_layers
@@ -61,16 +73,26 @@ class ShapeStore:
                 except Exception:
                     logger.exception("Capas de metro o estaciones no disponibles")
                     self._extra = {}
+                    self._retry_after = max(self._retry_after, time.monotonic() + 60.0)
 
     def body(self, feed: str) -> bytes:
         if self._bodies is None:
-            raise ShapeLoadError("los trazados no están listos")
-        return self._bodies[feed]
+            raise ShapeLoadError("los trazados no estan listos")
+        return self._bodies.get(feed) or _EMPTY_GEOJSON
 
     def extra(self, key: str) -> bytes:
         if self._extra is None:
-            raise ShapeLoadError("las capas no están listas")
+            raise ShapeLoadError("las capas no estan listas")
         return self._extra.get(key) or _EMPTY_GEOJSON
+
+    def _has_line_features(self) -> bool:
+        if self._bodies is None:
+            return False
+        try:
+            payload = json.loads(self._bodies.get("cercanias") or _EMPTY_GEOJSON)
+        except json.JSONDecodeError:
+            return False
+        return bool(payload.get("features"))
 
 
 _EMPTY_GEOJSON = b'{"type":"FeatureCollection","features":[]}'
@@ -93,14 +115,16 @@ def load_route_lines() -> dict[str, bytes]:
 
 def _route_line_bodies() -> dict[str, bytes]:
     cached = _read_cache()
-    if cached is not None and _fresh(CACHE_FILE):
+    if cached is not None and _fresh(CACHE_FILE) and _collections_have_features(cached["collections"]):
         return _encode(cached["collections"])
     collections, skipped, failed = _collections_from_disk_or_network()
-    if failed and not any(item["features"] for item in collections.values()):
-        if cached is not None:
-            logger.warning("GTFS no disponible; se usa la caché antigua")
+    if not _collections_have_features(collections):
+        if cached is not None and _collections_have_features(cached["collections"]):
+            logger.warning("GTFS vacío o caído; se mantiene la caché antigua con colores")
             return _encode(cached["collections"])
-        raise ShapeLoadError("No se han podido cargar los trazados")
+        if failed:
+            raise ShapeLoadError("No se han podido cargar los trazados")
+        raise ShapeLoadError("GTFS sin geometría de líneas")
     for note in skipped:
         logger.info("Trazado omitido: %s", note)
     try:
@@ -108,6 +132,10 @@ def _route_line_bodies() -> dict[str, bytes]:
     except OSError:
         logger.warning("No se pudo guardar la caché de trazados", exc_info=True)
     return _encode(collections)
+
+
+def _collections_have_features(collections: dict[str, Any]) -> bool:
+    return any(bool(_as_collection(item).get("features")) for item in collections.values())
 
 
 def collection_from_zip(blob: bytes, service: RenfeKind) -> tuple[dict[str, Any] | None, str | None]:
