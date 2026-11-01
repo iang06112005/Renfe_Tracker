@@ -3,6 +3,12 @@ import { useEffect, useState } from "react"
 import { SERVICE_LABEL } from "../types/trains"
 import type { FeedType } from "../types/trains"
 
+interface GroupChip {
+  id: string
+  label: string
+  color: string
+}
+
 interface FilterSidebarProps {
   feed: FeedType
   onFeedChange: (feed: FeedType) => void
@@ -10,6 +16,14 @@ interface FilterSidebarProps {
   hiddenLines: ReadonlySet<string>
   onToggleLine: (line: string) => void
   onShowAllLines: () => void
+  nuclei: GroupChip[]
+  hiddenNuclei: ReadonlySet<string>
+  onToggleNucleus: (code: string) => void
+  onShowAllNuclei: () => void
+  products: GroupChip[]
+  hiddenProducts: ReadonlySet<string>
+  onToggleProduct: (name: string) => void
+  onShowAllProducts: () => void
   visibleCount: number
   cercaniasCount: number
   ldCount: number
@@ -35,6 +49,14 @@ export function FilterSidebar({
   hiddenLines,
   onToggleLine,
   onShowAllLines,
+  nuclei,
+  hiddenNuclei,
+  onToggleNucleus,
+  onShowAllNuclei,
+  products,
+  hiddenProducts,
+  onToggleProduct,
+  onShowAllProducts,
   visibleCount,
   cercaniasCount,
   ldCount,
@@ -84,7 +106,7 @@ export function FilterSidebar({
       {!loading && !error && updatedAt !== null && visibleCount === 0 ? (
         <p className="hint">Renfe responde, pero ahora mismo no publica ninguna posición.</p>
       ) : null}
-      {feed !== "cercanias" ? (
+      {feed !== "cercanias" && products.length === 0 ? (
         <p className="hint">AVE, Media y Larga Distancia comparten el feed de larga distancia.</p>
       ) : null}
 
@@ -120,14 +142,26 @@ export function FilterSidebar({
       <p className="hint">Líneas de color: trazado GTFS. OpenRailwayMap muestra el resto de vías.</p>
       {linesError ? <p className="hint">{linesError}</p> : null}
 
-      <ul className="legend">
-        <li>
-          <i className="swatch cercanias" /> {SERVICE_LABEL.cercanias}
-        </li>
-        <li>
-          <i className="swatch ld" /> {SERVICE_LABEL.ld}
-        </li>
-      </ul>
+      {nuclei.length > 0 ? (
+        <GroupFilters
+          title="Núcleos"
+          groups={nuclei}
+          hidden={hiddenNuclei}
+          onToggle={onToggleNucleus}
+          onShowAll={onShowAllNuclei}
+        />
+      ) : null}
+      {products.length > 0 ? (
+        <GroupFilters
+          title="Servicios"
+          groups={products}
+          hidden={hiddenProducts}
+          onToggle={onToggleProduct}
+          onShowAll={onShowAllProducts}
+        />
+      ) : null}
+
+      <p className="hint">El color del tren distingue el núcleo o el servicio. Las vías siguen en segundo plano.</p>
 
       <button type="button" className="detail-toggle" aria-pressed={detailed} onClick={onToggleDetail}>
         <span>Detalle del tren</span>
@@ -138,6 +172,50 @@ export function FilterSidebar({
         Salir
       </button>
     </aside>
+  )
+}
+
+function GroupFilters({
+  title,
+  groups,
+  hidden,
+  onToggle,
+  onShowAll,
+}: {
+  title: string
+  groups: GroupChip[]
+  hidden: ReadonlySet<string>
+  onToggle: (id: string) => void
+  onShowAll: () => void
+}) {
+  return (
+    <div className="lines">
+      <div className="lines-head">
+        <h2>{title}</h2>
+        {hidden.size > 0 ? (
+          <button type="button" className="text-button" onClick={onShowAll}>
+            Mostrar todos
+          </button>
+        ) : null}
+      </div>
+      <div className="chips" role="group" aria-label={title}>
+        {groups.map((group) => {
+          const shown = !hidden.has(group.id)
+          return (
+            <button
+              key={group.id}
+              type="button"
+              aria-pressed={shown}
+              className="chip group-chip"
+              onClick={() => onToggle(group.id)}
+            >
+              <span className="swatch" style={{ background: group.color }} />
+              {group.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

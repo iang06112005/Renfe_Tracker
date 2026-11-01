@@ -19,13 +19,13 @@ const LABEL_LAYER = "trains-labels"
 interface MapViewProps {
   geojson: FeatureCollection
   routeLines: RouteLineCollection
-  hiddenLines: ReadonlySet<string>
+  hiddenNuclei: ReadonlySet<string>
   selectedId: string | null
   onSelect: (id: string | null) => void
   onReady: (map: MapLibreMap | null) => void
 }
 
-export function MapView({ geojson, routeLines, hiddenLines, selectedId, onSelect, onReady }: MapViewProps) {
+export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelect, onReady }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onSelect)
@@ -79,9 +79,13 @@ export function MapView({ geojson, routeLines, hiddenLines, selectedId, onSelect
         source: SOURCE_ID,
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 4.5, 3.2, 8, 5, 12, 7],
-          "circle-color": ["match", ["get", "service"], "cercanias", "#2ec4b6", "ld", "#f4a261", "#f3efe4"],
-          "circle-stroke-width": 1,
-          "circle-stroke-color": "#0c0d0b",
+          "circle-color": [
+            "coalesce",
+            ["get", "groupColor"],
+            ["match", ["get", "service"], "cercanias", "#2ec4b6", "ld", "#f4a261", "#f3efe4"],
+          ],
+          "circle-stroke-width": 1.25,
+          "circle-stroke-color": ["match", ["get", "service"], "ld", "#f3efe4", "#10211f"],
           "circle-opacity": 0.95,
         },
       })
@@ -156,8 +160,8 @@ export function MapView({ geojson, routeLines, hiddenLines, selectedId, onSelect
     const map = mapRef.current
     if (!map || !ready) return
     const source = map.getSource(ROUTE_SOURCE)
-    if (source instanceof GeoJSONSource) source.setData(visibleRouteLines(routeLines, hiddenLines))
-  }, [routeLines, hiddenLines, ready])
+    if (source instanceof GeoJSONSource) source.setData(visibleRouteLines(routeLines, hiddenNuclei))
+  }, [routeLines, hiddenNuclei, ready])
 
   useEffect(() => {
     const map = mapRef.current
@@ -210,13 +214,18 @@ function addRouteLines(map: MapLibreMap) {
   })
 }
 
-function visibleRouteLines(collection: RouteLineCollection, hidden: ReadonlySet<string>): RouteLineCollection {
-  if (hidden.size === 0) return collection
+function visibleRouteLines(collection: RouteLineCollection, hiddenNuclei: ReadonlySet<string>): RouteLineCollection {
+  if (hiddenNuclei.size === 0) return collection
   return {
     type: "FeatureCollection",
     features: collection.features.filter((feature) => {
-      const line = feature.properties.line
-      return line == null || !hidden.has(line)
+      const nucleus = nucleusFromShape(feature.properties.shapeId)
+      return nucleus == null || !hiddenNuclei.has(nucleus)
     }),
   }
+}
+
+function nucleusFromShape(shapeId: string): string | null {
+  const match = /^(\d{2})_/.exec(shapeId)
+  return match ? match[1] : null
 }

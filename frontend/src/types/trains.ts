@@ -13,6 +13,9 @@ export interface TrainProperties {
   timestamp: number | null
   service: ServiceKind
   product: string | null
+  nucleus: string | null
+  nucleusLabel: string | null
+  groupColor: string | null
   route: string | null
   previousStop: string | null
   nextStop: string | null

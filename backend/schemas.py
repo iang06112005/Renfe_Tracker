@@ -122,6 +122,9 @@ class TrainProperties(BaseModel):
     timestamp: int | None = None
     service: ServiceKind
     product: str | None = None
+    nucleus: str | None = None
+    nucleusLabel: str | None = None
+    groupColor: str | None = None
     route: str | None = None
     previousStop: str | None = None
     nextStop: str | None = None

@@ -49,7 +49,7 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
 
   const title = train.properties.line ?? train.properties.vehicleId ?? train.properties.id
   const status = train.properties.status ? (STATUS_LABEL[train.properties.status] ?? train.properties.status) : "Sin estado"
-  const flip = point.y < (detailed ? 320 : 160)
+  const placement = placePopup(point.y, detailed)
   const half = Math.min(140, window.innerWidth / 2 - 16)
   const left = Math.min(window.innerWidth - half - 12, Math.max(half + 12, point.x))
 
@@ -60,8 +60,10 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
       aria-label={`Tren ${title}`}
       style={{
         left,
-        top: point.y,
-        transform: flip ? "translate(-50%, 16px)" : "translate(-50%, calc(-100% - 14px))",
+        top: placement.top,
+        maxHeight: placement.maxHeight,
+        overflow: placement.maxHeight ? "auto" : undefined,
+        transform: placement.below ? "translate(-50%, 16px)" : "translate(-50%, calc(-100% - 14px))",
       }}
     >
       <button type="button" className="popup-close" onClick={onClose} aria-label="Cerrar">
@@ -77,6 +79,7 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
 function Detail({ properties, status }: { properties: TrainFeature["properties"]; status: string }) {
   const rows = [
     ["Servicio", properties.product],
+    ["Núcleo", nucleusText(properties.nucleus, properties.nucleusLabel)],
     ["Recorrido", properties.route],
     ["Anterior", properties.previousStop],
     ["En parada", properties.currentStop],
@@ -97,6 +100,22 @@ function Detail({ properties, status }: { properties: TrainFeature["properties"]
       ))}
     </dl>
   )
+}
+
+function placePopup(y: number, detailed: boolean): { top: number; below: boolean; maxHeight?: number } {
+  const narrow = window.innerWidth <= 720
+  if (!narrow) return { top: y, below: y < (detailed ? 320 : 160) }
+  const mapBottom = window.innerHeight * 0.52
+  const top = Math.min(Math.max(y, 24), mapBottom - 16)
+  const above = top - 12
+  const below = mapBottom - top - 12
+  const placeBelow = above < 180 && below > above
+  return { top, below: placeBelow, maxHeight: Math.max(96, (placeBelow ? below : above) - 4) }
+}
+
+function nucleusText(code: string | null, label: string | null): string | null {
+  if (label && code) return `${code} · ${label}`
+  return label ?? code
 }
 
 function formatTimestamp(timestamp: number | null): string {

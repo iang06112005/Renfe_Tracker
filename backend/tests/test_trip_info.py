@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from trip_info import Call, describe_train, ensure_trip_index, lookup
+from trip_info import Call, describe_train, ensure_trip_index, lookup, nucleus_color, nucleus_label, product_color
 
 
 def test_incoming_train_gets_real_neighbors_and_timetable() -> None:
@@ -82,6 +82,90 @@ def test_sqlite_index_resolves_a_trip(tmp_path: Path, monkeypatch: pytest.Monkey
     assert fields["previousStop"] == "El Cáñamo"
     assert fields["nextStop"] == "Brenes · 11:55"
     assert "product" not in fields
+    assert "nucleus" not in fields
+
+
+def test_nucleus_label_uses_a_station_the_feed_repeats() -> None:
+    assert nucleus_label({"Valencia Nord": 19, "Buñol": 8, "Moixent": 6}) == "Valencia"
+    assert nucleus_label({"Barcelona-Fabra i Puig": 10, "Barcelona-Estació de França": 8, "Vic": 10}) == "Barcelona"
+
+
+def test_nucleus_label_does_not_invent_a_city() -> None:
+    madrid = nucleus_label({"Chamartín - Clara Campoamor": 15, "Atocha": 5, "Principe Pio": 7})
+    sevilla = nucleus_label({"Santa Justa": 10, "Lebrija": 2, "Lora del Rio": 2})
+    assert madrid == "Chamartín"
+    assert sevilla == "Santa Justa"
+    assert "Madrid" not in madrid
+    assert "Sevilla" not in sevilla
+
+
+def test_tied_termini_keep_a_name_from_the_feed() -> None:
+    label = nucleus_label({"Casetas": 2, "Miraflores": 2, "Zaragoza Delicias": 2})
+    assert label == "Casetas"
+    assert "Iryo" not in label
+    assert "Ouigo" not in label
+
+
+def test_product_color_follows_the_route_short_name() -> None:
+    assert product_color("AVE") != product_color("ALVIA")
+    assert product_color("EUROMED") != product_color("MD")
+    assert product_color("AVE") != nucleus_color("51")
+    assert product_color("PROXIMDAD") != product_color("AVE")
+
+
+def test_index_separates_nucleus_and_long_distance_product(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cercanias = tmp_path / "cercanias.zip"
+    with zipfile.ZipFile(cercanias, "w") as archive:
+        archive.writestr("stops.txt", "stop_id,stop_name\nA,Chamartín - Clara Campoamor\n")
+        archive.writestr(
+            "routes.txt",
+            "route_id,route_short_name,route_long_name\n"
+            "10T0001C1,C1,Chamartín - Clara Campoamor          -Atocha\n"
+            "10T0002C1,C2,Atocha                              -Chamartín - Clara Campoamor\n"
+            "10T0003C1,C3,Chamartín - Clara Campoamor          -Cercedilla\n"
+            "10T0004C1,C4,Cercedilla                          -Chamartín - Clara Campoamor\n",
+        )
+        archive.writestr("trips.txt", "route_id,trip_id\n10T0001C1,trip-mad\n")
+        archive.writestr(
+            "stop_times.txt",
+            "trip_id,arrival_time,departure_time,stop_id,stop_sequence\ntrip-mad,08:00:00,08:01:00,A,1\n",
+        )
+    long_distance = tmp_path / "ld.zip"
+    with zipfile.ZipFile(long_distance, "w") as archive:
+        archive.writestr("stops.txt", "stop_id,stop_name\nS,Madrid Puerta de Atocha\n")
+        archive.writestr(
+            "routes.txt",
+            "route_id,route_short_name,route_long_name\nAV1,AVE,\nMD1,MD,\nAL1,ALVIA,\nEU1,EUROMED,\n",
+        )
+        archive.writestr("trips.txt", "route_id,trip_id\nAV1,trip-ave\nMD1,trip-md\n")
+        archive.writestr(
+            "stop_times.txt",
+            "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
+            "trip-ave,09:00:00,09:05:00,S,1\n"
+            "trip-md,10:00:00,10:04:00,S,1\n",
+        )
+    monkeypatch.setattr("trip_info.INDEX_PATH", tmp_path / "trip-index-v2.sqlite")
+    monkeypatch.setattr("trip_info.GTFS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr("gtfs_shapes.GTFS_FEEDS", {"cercanias": "unused", "ld": "unused"})
+    ensure_trip_index()
+
+    cercanias_fields = lookup("cercanias", "trip-mad", "A", "STOPPED_AT", "C1")
+    assert cercanias_fields["nucleus"] == "10"
+    assert cercanias_fields["nucleusLabel"] == "Chamartín"
+    assert cercanias_fields["groupColor"] == nucleus_color("10")
+    assert "Madrid" not in cercanias_fields["nucleusLabel"]
+
+    ave = lookup("ld", "trip-ave", "S", "STOPPED_AT", None)
+    media = lookup("ld", "trip-md", "S", "STOPPED_AT", None)
+    assert ave["product"] == "AVE"
+    assert media["product"] == "MD"
+    assert ave["groupColor"] == product_color("AVE")
+    assert media["groupColor"] == product_color("MD")
+    assert ave["groupColor"] != media["groupColor"]
+    assert "nucleus" not in ave
+    joined = " ".join(ave.values()) + " " + " ".join(media.values())
+    assert "Iryo" not in joined
+    assert "Ouigo" not in joined
 
 
 def test_hours_past_midnight_stay_on_the_clock() -> None:
