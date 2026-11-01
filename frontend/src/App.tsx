@@ -120,8 +120,8 @@ function applyVisibility(
       if (line && hiddenLines.has(line)) return false
       const nucleus = feature.properties.nucleus
       if (nucleus && hiddenNuclei.has(nucleus)) return false
-      const product = feature.properties.product
-      if (feature.properties.service === "ld" && product && hiddenProducts.has(product)) return false
+      const bucket = feature.properties.bucket
+      if (feature.properties.service === "ld" && bucket && hiddenProducts.has(bucket)) return false
       return true
     }),
   }
@@ -136,7 +136,7 @@ function toggleSet(setter: Dispatch<SetStateAction<Set<string>>>, id: string) {
   })
 }
 
-const PRODUCT_ORDER = ["AVE", "AVE INT", "AVLO", "ALVIA", "EUROMED", "AVANT", "AVANT EXP", "MD", "Intercity", "REGIONAL", "REG.EXP.", "PROXIMDAD", "TRENCELTA"]
+const BUCKET_ORDER = ["alta", "media", "larga"]
 
 function nucleusGroups(data: FeatureCollection | null): GroupChip[] {
   const byCode = new Map<string, GroupChip>()
@@ -147,28 +147,25 @@ function nucleusGroups(data: FeatureCollection | null): GroupChip[] {
     byCode.set(code, {
       id: code,
       label: place ? `${code} ${place}` : code,
-      color: feature.properties.groupColor ?? "#2ec4b6",
+      color: feature.properties.nucleusColor ?? "#e10600",
     })
   }
   return [...byCode.values()].sort((a, b) => a.id.localeCompare(b.id, "es", { numeric: true }))
 }
 
 function productGroups(data: FeatureCollection | null): GroupChip[] {
-  const byName = new Map<string, GroupChip>()
+  const byBucket = new Map<string, GroupChip>()
   for (const feature of data?.features ?? []) {
     if (feature.properties.service !== "ld") continue
-    const name = feature.properties.product
-    if (!name || byName.has(name)) continue
-    byName.set(name, { id: name, label: name, color: feature.properties.groupColor ?? "#f4a261" })
+    const bucket = feature.properties.bucket
+    if (!bucket || byBucket.has(bucket) || !BUCKET_ORDER.includes(bucket)) continue
+    byBucket.set(bucket, {
+      id: bucket,
+      label: feature.properties.bucketLabel ?? bucket,
+      color: feature.properties.bucketColor ?? "#c8c2b4",
+    })
   }
-  return [...byName.values()].sort((a, b) => {
-    const left = PRODUCT_ORDER.indexOf(a.id)
-    const right = PRODUCT_ORDER.indexOf(b.id)
-    if (left === -1 && right === -1) return a.label.localeCompare(b.label, "es")
-    if (left === -1) return 1
-    if (right === -1) return -1
-    return left - right
-  })
+  return [...byBucket.values()].sort((a, b) => BUCKET_ORDER.indexOf(a.id) - BUCKET_ORDER.indexOf(b.id))
 }
 
 interface GroupChip {

@@ -13,8 +13,12 @@ export interface TrainProperties {
   timestamp: number | null
   service: ServiceKind
   product: string | null
+  bucket: string | null
+  bucketLabel: string | null
+  bucketColor: string | null
   nucleus: string | null
   nucleusLabel: string | null
+  nucleusColor: string | null
   groupColor: string | null
   route: string | null
   previousStop: string | null
@@ -38,7 +42,7 @@ export interface FeatureCollection {
 
 export const SERVICE_LABEL: Record<ServiceKind, string> = {
   cercanias: "Cercanías",
-  ld: "AVE / Larga / Media",
+  ld: "Alta, media y larga",
 }
 
 export const EMPTY_COLLECTION: FeatureCollection = {

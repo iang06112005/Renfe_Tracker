@@ -39,7 +39,7 @@ interface FilterSidebarProps {
 const FEEDS: { id: FeedType; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "cercanias", label: "Cercanías" },
-  { id: "ld", label: "AVE / LD" },
+  { id: "ld", label: "Alta/MD/LD" },
 ]
 
 export function FilterSidebar({
@@ -107,7 +107,7 @@ export function FilterSidebar({
         <p className="hint">Renfe responde, pero ahora mismo no publica ninguna posición.</p>
       ) : null}
       {feed !== "cercanias" && products.length === 0 ? (
-        <p className="hint">AVE, Media y Larga Distancia comparten el feed de larga distancia.</p>
+        <p className="hint">Alta velocidad, media y larga distancia comparten un feed. Cada una lleva su etiqueta.</p>
       ) : null}
 
       {error ? (
@@ -161,7 +161,9 @@ export function FilterSidebar({
         />
       ) : null}
 
-      <p className="hint">El color del tren distingue el núcleo o el servicio. Las vías siguen en segundo plano.</p>
+      <p className="hint">
+        Madrid lleva el color de cada línea. Los demás núcleos, uno por ciudad. Las vías siguen en segundo plano.
+      </p>
 
       <button type="button" className="detail-toggle" aria-pressed={detailed} onClick={onToggleDetail}>
         <span>Detalle del tren</span>

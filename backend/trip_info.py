@@ -10,37 +10,72 @@ from schemas import ServiceKind
 
 INDEX_PATH = GTFS_CACHE_DIR / "trip-index-v2.sqlite"
 _GENERIC_TOKENS = {"san", "santa", "sant", "el", "la", "los", "las", "les", "l'"}
-_PRODUCT_COLORS = {
-    "AVE": "#e10600",
-    "AVE INT": "#ff6b6b",
-    "AVLO": "#ff9f1c",
-    "ALVIA": "#3d5a80",
-    "EUROMED": "#2a9d8f",
-    "AVANT": "#ffe66d",
-    "AVANT EXP": "#fff3b0",
-    "MD": "#9b5de5",
-    "REGIONAL": "#6c757d",
-    "REG.EXP.": "#495057",
-    "Intercity": "#2d6a4f",
-    "PROXIMDAD": "#e76f51",
-    "TRENCELTA": "#ced4da",
+_BUCKET_LABEL = {
+    "alta": "Alta velocidad",
+    "media": "Media distancia",
+    "larga": "Larga distancia",
+    "cercanias": "Cercanías",
+    "rodalies": "Rodalies",
+}
+_BUCKET_COLOR = {
+    "alta": "#7b2d8e",
+    "media": "#0f9d8a",
+    "larga": "#3b6dff",
+    "cercanias": "#e10600",
+    "rodalies": "#ff7a00",
+}
+_ALTA = {"AVE", "AVLO", "AVE INT"}
+_MEDIA = {"MD", "REGIONAL", "REG.EXP.", "PROXIMDAD", "Intercity", "AVANT", "AVANT EXP"}
+_LARGA = {"ALVIA", "EUROMED", "TRENCELTA"}
+_NUCLEUS_CITIES = {
+    "10": "Madrid",
+    "20": "Gijón",
+    "30": "Sevilla",
+    "31": "Cádiz",
+    "32": "Málaga",
+    "40": "Valencia",
+    "41": "Alicante",
+    "45": "Murcia",
+    "46": "Ferrol",
+    "47": "León",
+    "51": "Barcelona",
+    "60": "Bilbao",
+    "61": "Irún",
+    "62": "Santander",
+    "70": "Zaragoza",
 }
 _NUCLEUS_COLORS = {
-    "10": "#5dade2",
-    "20": "#58d68d",
-    "30": "#f5b041",
-    "31": "#e59866",
-    "32": "#f0b27a",
-    "40": "#af7ac5",
-    "41": "#bb8fce",
-    "45": "#85929e",
-    "46": "#7f8c8d",
-    "47": "#aab7b8",
-    "51": "#ec7063",
-    "60": "#48c9b0",
-    "61": "#76d7c4",
-    "62": "#1abc9c",
-    "70": "#f4d03f",
+    "10": "#e10600",
+    "20": "#1e8449",
+    "30": "#b7950b",
+    "31": "#ca6f1e",
+    "32": "#0e6655",
+    "40": "#5dade2",
+    "41": "#a04000",
+    "45": "#5d6d7e",
+    "46": "#1a5276",
+    "47": "#873600",
+    "51": "#ff7a00",
+    "60": "#148f77",
+    "61": "#cd6155",
+    "62": "#196f3d",
+    "70": "#6e2c00",
+}
+# Colores publicados en route_color del núcleo 10. C4 es azul y C5 amarillo.
+_MADRID_LINE_COLORS = {
+    "C1": "#75b6e0",
+    "C2": "#00943d",
+    "C3": "#952585",
+    "C4": "#2c2a86",
+    "C4A": "#2c2a86",
+    "C4B": "#2c2a86",
+    "C5": "#fecb00",
+    "C7": "#e5202a",
+    "C8": "#868584",
+    "C8A": "#868584",
+    "C8B": "#868584",
+    "C9": "#915419",
+    "C10": "#bccf00",
 }
 _LOCK = threading.Lock()
 _CONN: sqlite3.Connection | None = None
@@ -127,12 +162,23 @@ def lookup(service: ServiceKind, trip_id: str | None, stop_id: str | None, statu
         calls=calls,
     )
     if trip and trip[2]:
-        fields["nucleus"] = trip[2]
-        if trip[3]:
-            fields["nucleusLabel"] = trip[3]
-        fields["groupColor"] = nucleus_color(trip[2])
+        code = trip[2]
+        fields["nucleus"] = code
+        label = city_name(code) or (trip[3] or None)
+        if label:
+            fields["nucleusLabel"] = label
+        fields["nucleusColor"] = nucleus_color(code)
+        bucket = "rodalies" if code == "51" else "cercanias"
+        _put_bucket(fields, bucket)
+        if code == "10":
+            fields["groupColor"] = madrid_line_color(line) or _BUCKET_COLOR["cercanias"]
+        else:
+            fields["groupColor"] = nucleus_color(code)
     elif trip and trip[0] and service == "ld":
-        fields["groupColor"] = product_color(trip[0])
+        bucket = product_bucket(trip[0])
+        if bucket:
+            _put_bucket(fields, bucket)
+            fields["groupColor"] = _BUCKET_COLOR[bucket]
     return fields
 
 
@@ -237,14 +283,41 @@ def nucleus_label(endpoint_counts: dict[str, int]) -> str:
     return ranked[0]
 
 
+def city_name(code: str) -> str | None:
+    return _NUCLEUS_CITIES.get(code)
+
+
 def nucleus_color(code: str) -> str:
     return _NUCLEUS_COLORS.get(code) or _palette_color(code)
 
 
+def product_bucket(name: str | None) -> str | None:
+    if name in _ALTA:
+        return "alta"
+    if name in _MEDIA:
+        return "media"
+    if name in _LARGA:
+        return "larga"
+    return None
+
+
 def product_color(name: str) -> str:
-    if name in _PRODUCT_COLORS:
-        return _PRODUCT_COLORS[name]
+    bucket = product_bucket(name)
+    if bucket:
+        return _BUCKET_COLOR[bucket]
     return _palette_color(name)
+
+
+def madrid_line_color(line: str | None) -> str | None:
+    if not line:
+        return None
+    return _MADRID_LINE_COLORS.get(line.upper())
+
+
+def _put_bucket(fields: dict[str, str], bucket: str) -> None:
+    fields["bucket"] = bucket
+    fields["bucketLabel"] = _BUCKET_LABEL[bucket]
+    fields["bucketColor"] = _BUCKET_COLOR[bucket]
 
 
 def _palette_color(value: str) -> str:
@@ -292,7 +365,7 @@ def _insert_nuclei(connection: sqlite3.Connection, service: ServiceKind, archive
             bucket[name] = bucket.get(name, 0) + 1
     rows = []
     for code, bucket in counts.items():
-        label = nucleus_label(bucket)
+        label = city_name(code) or nucleus_label(bucket)
         if label:
             rows.append((service, code, label, nucleus_color(code)))
     connection.executemany(

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import type { Map as MapLibreMap } from "maplibre-gl"
 
-import { SERVICE_LABEL, type TrainFeature } from "../types/trains"
+import type { TrainFeature } from "../types/trains"
 
 interface TrainPopupProps {
   map: MapLibreMap | null
@@ -69,7 +69,11 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
       <button type="button" className="popup-close" onClick={onClose} aria-label="Cerrar">
         ×
       </button>
-      {detailed ? <p className={`popup-kicker ${train.properties.service}`}>{SERVICE_LABEL[train.properties.service]}</p> : null}
+      {detailed && train.properties.bucketLabel ? (
+        <p className="popup-kicker" style={{ color: train.properties.bucketColor ?? undefined }}>
+          {train.properties.bucketLabel}
+        </p>
+      ) : null}
       <h2>{title}</h2>
       {detailed ? <Detail properties={train.properties} status={status} /> : null}
     </div>
@@ -78,7 +82,7 @@ export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
 
 function Detail({ properties, status }: { properties: TrainFeature["properties"]; status: string }) {
   const rows = [
-    ["Servicio", properties.product],
+    ["Producto", properties.bucket ? properties.product : null],
     ["Núcleo", nucleusText(properties.nucleus, properties.nucleusLabel)],
     ["Recorrido", properties.route],
     ["Anterior", properties.previousStop],

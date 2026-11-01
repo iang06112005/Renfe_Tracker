@@ -6,8 +6,11 @@
   --text: #f3efe4;
   --muted: #b4ad9e;
   --red: #e10600;
-  --cercanias: #2ec4b6;
-  --ld: #f4a261;
+  --cercanias: #e10600;
+  --rodalies: #ff7a00;
+  --alta: #7b2d8e;
+  --media: #0f9d8a;
+  --larga: #3b6dff;
   --danger: #ff8f7a;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   color: var(--text);
@@ -170,7 +173,7 @@ button:focus-visible, input:focus-visible {
 }
 
 .chip[aria-pressed="true"] {
-  border-color: var(--cercanias);
+  border-color: var(--text);
   color: var(--text);
 }
 
@@ -207,7 +210,7 @@ button:focus-visible, input:focus-visible {
 }
 
 .swatch.cercanias { background: var(--cercanias); }
-.swatch.ld { background: var(--ld); }
+.swatch.rodalies { background: var(--rodalies); }
 
 .logout {
   width: 100%;
@@ -257,7 +260,10 @@ button:focus-visible, input:focus-visible {
 }
 
 .popup-kicker.cercanias { color: var(--cercanias); }
-.popup-kicker.ld { color: var(--ld); }
+.popup-kicker.rodalies { color: var(--rodalies); }
+.popup-kicker.alta { color: var(--alta); }
+.popup-kicker.media { color: var(--media); }
+.popup-kicker.larga { color: var(--larga); }
 
 .popup dl { margin: 10px 0 0; }
 

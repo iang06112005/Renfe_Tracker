@@ -82,7 +82,7 @@ export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelec
           "circle-color": [
             "coalesce",
             ["get", "groupColor"],
-            ["match", ["get", "service"], "cercanias", "#2ec4b6", "ld", "#f4a261", "#f3efe4"],
+            ["match", ["get", "service"], "cercanias", "#e10600", "#c8c2b4"],
           ],
           "circle-stroke-width": 1.25,
           "circle-stroke-color": ["match", ["get", "service"], "ld", "#f3efe4", "#10211f"],
