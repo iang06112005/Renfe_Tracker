@@ -161,11 +161,28 @@ async def trains(
 @app.get("/api/lines", response_class=GeoJSONResponse)
 async def lines(
     request: Request,
-    feed: FeedType = Query(default="all", alias="type"),
+    feed: str = Query(default="all", alias="type"),
 ) -> Response:
     await _wait_for_shapes(request)
     store: ShapeStore = request.app.state.shapes
+    if feed == "metro":
+        return Response(content=store.extra("metro-lines"), media_type="application/geo+json")
+    if feed not in {"cercanias", "ld", "all"}:
+        raise HTTPException(status_code=422, detail="tipo de trazado desconocido")
     return Response(content=store.body(feed), media_type="application/geo+json")
+
+
+@app.get("/api/stops", response_class=GeoJSONResponse)
+async def stops(
+    request: Request,
+    feed: str = Query(default="all", alias="type"),
+) -> Response:
+    await _wait_for_shapes(request)
+    store: ShapeStore = request.app.state.shapes
+    key = {"cercanias": "stops-cercanias", "ld": "stops-ld", "all": "stops-all", "metro": "stops-metro"}.get(feed)
+    if key is None:
+        raise HTTPException(status_code=422, detail="tipo de paradas desconocido")
+    return Response(content=store.extra(key), media_type="application/geo+json")
 
 
 async def _wait_for_shapes(request: Request) -> None:

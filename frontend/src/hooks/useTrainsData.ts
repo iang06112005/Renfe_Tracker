@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 
 import { AuthError, fetchTrains } from "../services/trains"
-import type { FeatureCollection, FeedType } from "../types/trains"
+import { EMPTY_COLLECTION, type FeatureCollection, type FeedType } from "../types/trains"
 
 const POLL_INTERVAL_MS = 5_000
 
-export function useTrainsData(feed: FeedType, onUnauthorized: () => void) {
+export function useTrainsData(feed: FeedType, onUnauthorized: () => void, enabled = true) {
   const [data, setData] = useState<FeatureCollection | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
@@ -14,6 +14,13 @@ export function useTrainsData(feed: FeedType, onUnauthorized: () => void) {
   onUnauthorizedRef.current = onUnauthorized
 
   useEffect(() => {
+    if (!enabled) {
+      setData(EMPTY_COLLECTION)
+      setError(null)
+      setUpdatedAt(null)
+      setLoading(false)
+      return
+    }
     let active = true
     let current: AbortController | null = null
 
@@ -47,7 +54,7 @@ export function useTrainsData(feed: FeedType, onUnauthorized: () => void) {
       current?.abort()
       window.clearInterval(timer)
     }
-  }, [feed])
+  }, [feed, enabled])
 
   return { data, error, updatedAt, loading }
 }

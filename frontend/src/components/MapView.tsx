@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from "react"
 import maplibregl, { GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl"
 
 import type { RouteLineCollection } from "../types/lines"
+import type { StationCollection } from "../types/stops"
 import type { FeatureCollection } from "../types/trains"
 
-const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+const STYLE_URL = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
 const RAIL_TILES = ["https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png"]
 const RAIL_SOURCE = "openrailwaymap"
 const RAIL_LAYER = "openrailwaymap"
 const ROUTE_SOURCE = "route-lines"
+const ROUTE_CASING = "route-lines-casing"
 const ROUTE_LAYER = "route-lines"
+const STATION_SOURCE = "stations"
+const STATION_LAYER = "stations"
+const STATION_LABELS = "station-labels"
 const SOURCE_ID = "trains"
 const HIT_LAYER = "trains-hit"
 const CIRCLE_LAYER = "trains-circles"
@@ -19,13 +24,26 @@ const LABEL_LAYER = "trains-labels"
 interface MapViewProps {
   geojson: FeatureCollection
   routeLines: RouteLineCollection
+  stations: StationCollection
   hiddenNuclei: ReadonlySet<string>
+  hiddenLines: ReadonlySet<string>
+  network: "renfe" | "metro"
   selectedId: string | null
   onSelect: (id: string | null) => void
   onReady: (map: MapLibreMap | null) => void
 }
 
-export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelect, onReady }: MapViewProps) {
+export function MapView({
+  geojson,
+  routeLines,
+  stations,
+  hiddenNuclei,
+  hiddenLines,
+  network,
+  selectedId,
+  onSelect,
+  onReady,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onSelect)
@@ -62,6 +80,7 @@ export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelec
       if (cancelled) return
       addRailNetwork(map)
       addRouteLines(map)
+      addStations(map)
       map.addSource(SOURCE_ID, { type: "geojson", data: geojsonRef.current })
       map.addLayer({
         id: HIT_LAYER,
@@ -84,9 +103,9 @@ export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelec
             ["get", "groupColor"],
             ["match", ["get", "service"], "cercanias", "#e10600", "#c8c2b4"],
           ],
-          "circle-stroke-width": 1.25,
-          "circle-stroke-color": ["match", ["get", "service"], "ld", "#f3efe4", "#10211f"],
-          "circle-opacity": 0.95,
+          "circle-stroke-width": 1.4,
+          "circle-stroke-color": "#1c1917",
+          "circle-opacity": 0.96,
         },
       })
       map.addLayer({
@@ -98,7 +117,7 @@ export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelec
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 4.5, 7, 8, 10, 12, 13],
           "circle-color": "transparent",
           "circle-stroke-width": 2,
-          "circle-stroke-color": "#f3efe4",
+          "circle-stroke-color": "#1c1917",
         },
       })
       map.addLayer({
@@ -115,9 +134,9 @@ export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelec
           "text-allow-overlap": false,
         },
         paint: {
-          "text-color": "#f3efe4",
-          "text-halo-color": "#0c0d0b",
-          "text-halo-width": 1.2,
+          "text-color": "#1c1917",
+          "text-halo-color": "#f7f5f0",
+          "text-halo-width": 1.4,
         },
       })
       map.on("click", (event) => {
@@ -160,8 +179,32 @@ export function MapView({ geojson, routeLines, hiddenNuclei, selectedId, onSelec
     const map = mapRef.current
     if (!map || !ready) return
     const source = map.getSource(ROUTE_SOURCE)
-    if (source instanceof GeoJSONSource) source.setData(visibleRouteLines(routeLines, hiddenNuclei))
-  }, [routeLines, hiddenNuclei, ready])
+    if (source instanceof GeoJSONSource) source.setData(visibleRouteLines(routeLines, hiddenNuclei, hiddenLines))
+  }, [routeLines, hiddenNuclei, hiddenLines, ready])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const source = map.getSource(STATION_SOURCE)
+    if (source instanceof GeoJSONSource) source.setData(stations)
+  }, [stations, ready])
+
+  const positioned = useRef(false)
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready || !map.getLayer(RAIL_LAYER)) return
+    map.setLayoutProperty(RAIL_LAYER, "visibility", network === "metro" ? "none" : "visible")
+    if (!positioned.current) {
+      positioned.current = true
+      if (network === "renfe") return
+    }
+    const target =
+      network === "metro"
+        ? { center: [-3.7038, 40.4168] as [number, number], zoom: 12 }
+        : { center: [-3.7, 40.0] as [number, number], zoom: 5.4 }
+    map.flyTo({ ...target, essential: true })
+  }, [network, ready])
 
   useEffect(() => {
     const map = mapRef.current
@@ -185,11 +228,11 @@ function addRailNetwork(map: MapLibreMap) {
     type: "raster",
     source: RAIL_SOURCE,
     paint: {
-      "raster-opacity": 0.28,
-      "raster-saturation": -0.75,
-      "raster-contrast": -0.25,
-      "raster-brightness-min": 0,
-      "raster-brightness-max": 0.45,
+      "raster-opacity": 0.16,
+      "raster-saturation": -0.85,
+      "raster-contrast": -0.35,
+      "raster-brightness-min": 0.15,
+      "raster-brightness-max": 0.92,
       "raster-fade-duration": 0,
     },
   })
@@ -201,24 +244,78 @@ function addRouteLines(map: MapLibreMap) {
     data: { type: "FeatureCollection", features: [] },
   })
   map.addLayer({
+    id: ROUTE_CASING,
+    type: "line",
+    source: ROUTE_SOURCE,
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: {
+      "line-color": "#f7f5f0",
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.35, 11, 0.85, 14, 0.95],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.9, 10, 2.2, 13, 4.2, 15, 6.4],
+    },
+  })
+  map.addLayer({
     id: ROUTE_LAYER,
     type: "line",
     source: ROUTE_SOURCE,
     layout: { "line-join": "round", "line-cap": "round" },
     paint: {
-      "line-color": ["coalesce", ["get", "color"], "#8d8a82"],
-      "line-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.32, 8, 0.48, 12, 0.6],
-      "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.6, 8, 1.1, 13, 1.8],
-      "line-blur": 0.2,
+      "line-color": ["coalesce", ["get", "color"], "#5c6570"],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.62, 10, 0.9, 14, 0.96],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.7, 10, 1.8, 13, 3.1, 15, 4.6],
     },
   })
 }
 
-function visibleRouteLines(collection: RouteLineCollection, hiddenNuclei: ReadonlySet<string>): RouteLineCollection {
-  if (hiddenNuclei.size === 0) return collection
+function addStations(map: MapLibreMap) {
+  map.addSource(STATION_SOURCE, {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  })
+  map.addLayer({
+    id: STATION_LAYER,
+    type: "circle",
+    source: STATION_SOURCE,
+    minzoom: 11,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2.2, 13, 3.4, 15, 5],
+      "circle-color": "#ffffff",
+      "circle-stroke-width": 1.4,
+      "circle-stroke-color": "#2c333a",
+    },
+  })
+  map.addLayer({
+    id: STATION_LABELS,
+    type: "symbol",
+    source: STATION_SOURCE,
+    minzoom: 13,
+    layout: {
+      "text-field": ["get", "name"],
+      "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+      "text-size": 11,
+      "text-offset": [0, 0.9],
+      "text-anchor": "top",
+      "text-optional": true,
+    },
+    paint: {
+      "text-color": "#2c333a",
+      "text-halo-color": "#f7f5f0",
+      "text-halo-width": 1.2,
+    },
+  })
+}
+
+function visibleRouteLines(
+  collection: RouteLineCollection,
+  hiddenNuclei: ReadonlySet<string>,
+  hiddenLines: ReadonlySet<string>,
+): RouteLineCollection {
+  if (hiddenNuclei.size === 0 && hiddenLines.size === 0) return collection
   return {
     type: "FeatureCollection",
     features: collection.features.filter((feature) => {
+      const line = feature.properties.line
+      if (line && hiddenLines.has(line)) return false
       const nucleus = nucleusFromShape(feature.properties.shapeId)
       return nucleus == null || !hiddenNuclei.has(nucleus)
     }),

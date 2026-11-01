@@ -41,23 +41,39 @@ class ShapeLoadError(Exception):
 class ShapeStore:
     def __init__(self) -> None:
         self._bodies: dict[str, bytes] | None = None
+        self._extra: dict[str, bytes] | None = None
 
     async def ensure_loaded(self) -> None:
-        if self._bodies is not None:
+        if self._bodies is not None and self._extra is not None:
             return
         async with _GUARD:
-            if self._bodies is not None:
-                return
-            try:
-                self._bodies = await asyncio.to_thread(load_route_lines)
-            except Exception:
-                logger.exception("GTFS estático no disponible; el mapa arranca sin trazados")
-                self._bodies = _encode({})
+            if self._bodies is None:
+                try:
+                    self._bodies = await asyncio.to_thread(load_route_lines)
+                except Exception:
+                    logger.exception("GTFS estático no disponible; el mapa arranca sin trazados")
+                    self._bodies = _encode({})
+            if self._extra is None:
+                try:
+                    from transit_layers import load_transit_layers
+
+                    self._extra = await asyncio.to_thread(load_transit_layers)
+                except Exception:
+                    logger.exception("Capas de metro o estaciones no disponibles")
+                    self._extra = {}
 
     def body(self, feed: str) -> bytes:
         if self._bodies is None:
             raise ShapeLoadError("los trazados no están listos")
         return self._bodies[feed]
+
+    def extra(self, key: str) -> bytes:
+        if self._extra is None:
+            raise ShapeLoadError("las capas no están listas")
+        return self._extra.get(key) or _EMPTY_GEOJSON
+
+
+_EMPTY_GEOJSON = b'{"type":"FeatureCollection","features":[]}'
 
 
 _GUARD = asyncio.Lock()
@@ -220,7 +236,7 @@ def _choose_lines(
 def _line_features(
     rows: Any,
     chosen: dict[str, tuple[str | None, str]],
-    service: ServiceKind,
+    service: str,
 ) -> list[dict[str, Any]]:
     grouped: dict[str, list[tuple[int, float, float]]] = defaultdict(list)
     for row in rows:

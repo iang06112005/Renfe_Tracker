@@ -7,9 +7,13 @@ import { MapView } from "./components/MapView"
 import { TrainPopup } from "./components/TrainPopup"
 import { useSession } from "./hooks/useSession"
 import { useRouteLines } from "./hooks/useRouteLines"
+import { useStations } from "./hooks/useStations"
 import { useTrainInterpolation } from "./hooks/useTrainInterpolation"
 import { useTrainsData } from "./hooks/useTrainsData"
+import type { RouteLineCollection } from "./types/lines"
 import type { FeatureCollection, FeedType } from "./types/trains"
+
+type Network = "renfe" | "metro"
 
 export function App() {
   const { status, refresh, markAnonymous, logout } = useSession()
@@ -26,6 +30,7 @@ export function App() {
 }
 
 function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnauthorized: () => void }) {
+  const [network, setNetwork] = useState<Network>("renfe")
   const [feed, setFeed] = useState<FeedType>("all")
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(() => new Set())
   const [hiddenNuclei, setHiddenNuclei] = useState<Set<string>>(() => new Set())
@@ -33,8 +38,10 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailed, setDetailed] = useState(true)
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  const { data, error, updatedAt, loading } = useTrainsData(feed, onUnauthorized)
-  const routeLines = useRouteLines(feed, onUnauthorized)
+  const metro = network === "metro"
+  const { data, error, updatedAt, loading } = useTrainsData(feed, onUnauthorized, !metro)
+  const routeLines = useRouteLines(metro ? "metro" : feed, onUnauthorized)
+  const stations = useStations(metro ? "metro" : feed, onUnauthorized)
   const visible = useMemo(
     () => applyVisibility(data, hiddenLines, hiddenNuclei, hiddenProducts),
     [data, hiddenLines, hiddenNuclei, hiddenProducts],
@@ -43,9 +50,21 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   const products = useMemo(() => productGroups(data), [data])
   const frame = useTrainInterpolation(visible)
   const selected = frame.features.find((feature) => feature.properties.id === selectedId) ?? null
-  const lines = useMemo(() => uniqueLines(data), [data])
+  const lines = useMemo(
+    () => (metro ? shapeLines(routeLines.data) : uniqueLines(data)),
+    [metro, routeLines.data, data],
+  )
+  const lineColors = useMemo(() => (metro ? shapeColors(routeLines.data) : {}), [metro, routeLines.data])
   const counts = useMemo(() => countServices(data), [data])
   const closePopup = useCallback(() => setSelectedId(null), [])
+
+  function changeNetwork(next: Network) {
+    setNetwork(next)
+    setHiddenLines(new Set())
+    setHiddenNuclei(new Set())
+    setHiddenProducts(new Set())
+    setSelectedId(null)
+  }
 
   function changeFeed(next: FeedType) {
     setFeed(next)
@@ -67,18 +86,24 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   return (
     <div className="app">
       <MapView
-        geojson={frame}
+        geojson={metro ? { type: "FeatureCollection", features: [] } : frame}
         routeLines={routeLines.data}
+        stations={stations.data}
         hiddenNuclei={hiddenNuclei}
+        hiddenLines={hiddenLines}
+        network={network}
         selectedId={selectedId}
         onSelect={setSelectedId}
         onReady={setMap}
       />
       <TrainPopup map={map} train={selected} detailed={detailed} onClose={closePopup} />
       <FilterSidebar
+        network={network}
+        onNetworkChange={changeNetwork}
         feed={feed}
         onFeedChange={changeFeed}
         lines={lines}
+        lineColors={lineColors}
         hiddenLines={hiddenLines}
         onToggleLine={toggleLine}
         onShowAllLines={() => setHiddenLines(new Set())}
@@ -96,7 +121,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
         updatedAt={updatedAt}
         loading={loading}
         error={error}
-        linesError={routeLines.error}
+        linesError={routeLines.error ?? stations.error}
         detailed={detailed}
         onToggleDetail={() => setDetailed((current) => !current)}
         onLogout={onLogout}
@@ -179,7 +204,24 @@ function uniqueLines(data: FeatureCollection | null): string[] {
   for (const feature of data?.features ?? []) {
     if (feature.properties.line) lines.add(feature.properties.line)
   }
-  return [...lines].sort((a, b) => a.localeCompare(b, "es"))
+  return [...lines].sort((a, b) => a.localeCompare(b, "es", { numeric: true }))
+}
+
+function shapeLines(data: RouteLineCollection): string[] {
+  const lines = new Set<string>()
+  for (const feature of data.features) {
+    if (feature.properties.line) lines.add(feature.properties.line)
+  }
+  return [...lines].sort((a, b) => a.localeCompare(b, "es", { numeric: true }))
+}
+
+function shapeColors(data: RouteLineCollection): Record<string, string> {
+  const colors: Record<string, string> = {}
+  for (const feature of data.features) {
+    const line = feature.properties.line
+    if (line && !colors[line]) colors[line] = feature.properties.color
+  }
+  return colors
 }
 
 function countServices(data: FeatureCollection | null): { cercanias: number; ld: number } {

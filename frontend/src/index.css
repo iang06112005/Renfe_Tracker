@@ -79,6 +79,8 @@ button:focus-visible, input:focus-visible {
   text-transform: uppercase;
 }
 
+.segment.network { grid-template-columns: 1fr 1fr; }
+
 .segment {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -123,6 +125,8 @@ button:focus-visible, input:focus-visible {
 .meta, .hint { margin: 4px 0 0; font-size: 13px; }
 
 .hint { line-height: 1.4; }
+
+.hint a { color: var(--text); }
 
 .form-error {
   margin: 12px 0 0;

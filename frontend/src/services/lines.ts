@@ -1,8 +1,7 @@
 import type { RouteLineCollection, RouteLineFeature } from "../types/lines"
-import type { FeedType } from "../types/trains"
 import { AuthError } from "./trains"
 
-export async function fetchRouteLines(feed: FeedType, signal?: AbortSignal): Promise<RouteLineCollection> {
+export async function fetchRouteLines(feed: string, signal?: AbortSignal): Promise<RouteLineCollection> {
   const response = await fetch(`/api/lines?type=${encodeURIComponent(feed)}`, {
     signal,
     credentials: "same-origin",
@@ -32,7 +31,7 @@ function parseFeature(value: unknown): RouteLineFeature | null {
   const coordinates = value.geometry.coordinates.flatMap(readPoint)
   if (coordinates.length < 2 || coordinates.length !== value.geometry.coordinates.length) return null
   const service = value.properties.service
-  if (service !== "cercanias" && service !== "ld") return null
+  if (service !== "cercanias" && service !== "ld" && service !== "metro") return null
   if (typeof value.properties.shapeId !== "string" || typeof value.properties.color !== "string") return null
   const line = value.properties.line
   return {

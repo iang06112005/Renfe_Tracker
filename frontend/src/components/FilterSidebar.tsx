@@ -10,8 +10,11 @@ interface GroupChip {
 }
 
 interface FilterSidebarProps {
+  network: "renfe" | "metro"
+  onNetworkChange: (network: "renfe" | "metro") => void
   feed: FeedType
   onFeedChange: (feed: FeedType) => void
+  lineColors: Record<string, string>
   lines: string[]
   hiddenLines: ReadonlySet<string>
   onToggleLine: (line: string) => void
@@ -43,9 +46,12 @@ const FEEDS: { id: FeedType; label: string }[] = [
 ]
 
 export function FilterSidebar({
+  network,
+  onNetworkChange,
   feed,
   onFeedChange,
   lines,
+  lineColors,
   hiddenLines,
   onToggleLine,
   onShowAllLines,
@@ -84,6 +90,16 @@ export function FilterSidebar({
         </h1>
       </header>
 
+      <div className="segment network" role="group" aria-label="Red">
+        <button type="button" aria-pressed={network === "renfe"} onClick={() => onNetworkChange("renfe")}>
+          Renfe
+        </button>
+        <button type="button" aria-pressed={network === "metro"} onClick={() => onNetworkChange("metro")}>
+          Metro Madrid
+        </button>
+      </div>
+
+      {network === "renfe" ? (
       <div className="segment" role="group" aria-label="Tipo de servicio">
         {FEEDS.map((item) => (
           <button
@@ -96,17 +112,27 @@ export function FilterSidebar({
           </button>
         ))}
       </div>
+      ) : null}
 
       <p className="count">
-        <strong>{loading && visibleCount === 0 ? "…" : visibleCount}</strong>
-        <span>{visibleCount === 1 ? "tren en el mapa" : "trenes en el mapa"}</span>
+        <strong>{network === "metro" ? "—" : loading && visibleCount === 0 ? "…" : visibleCount}</strong>
+        <span>{network === "metro" ? "sin posiciones en vivo" : visibleCount === 1 ? "tren en el mapa" : "trenes en el mapa"}</span>
       </p>
-      <p className="meta">{serviceSummary(cercaniasCount, ldCount)}</p>
-      <p className="meta">{formatAge(updatedAt, now)}</p>
-      {!loading && !error && updatedAt !== null && visibleCount === 0 ? (
+      {network === "renfe" ? <p className="meta">{serviceSummary(cercaniasCount, ldCount)}</p> : null}
+      {network === "renfe" ? <p className="meta">{formatAge(updatedAt, now)}</p> : null}
+      {network === "metro" ? (
+        <p className="hint">
+          Metro de Madrid no publica posiciones en abierto. Líneas y estaciones: CRTM.{" "}
+          <a href="https://www.transportes.gob.es/" target="_blank" rel="noreferrer">
+            Powered by MITRAMS
+          </a>
+          .
+        </p>
+      ) : null}
+      {network === "renfe" && !loading && !error && updatedAt !== null && visibleCount === 0 ? (
         <p className="hint">Renfe responde, pero ahora mismo no publica ninguna posición.</p>
       ) : null}
-      {feed !== "cercanias" && products.length === 0 ? (
+      {network === "renfe" && feed !== "cercanias" && products.length === 0 ? (
         <p className="hint">Alta velocidad, media y larga distancia comparten un feed. Cada una lleva su etiqueta.</p>
       ) : null}
 
@@ -130,7 +156,14 @@ export function FilterSidebar({
             {lines.map((line) => {
               const hidden = hiddenLines.has(line)
               return (
-                <button key={line} type="button" aria-pressed={!hidden} className="chip" onClick={() => onToggleLine(line)}>
+                <button
+                  key={line}
+                  type="button"
+                  aria-pressed={!hidden}
+                  className={lineColors[line] ? "chip group-chip" : "chip"}
+                  onClick={() => onToggleLine(line)}
+                >
+                  {lineColors[line] ? <span className="swatch" style={{ background: lineColors[line] }} /> : null}
                   {line}
                 </button>
               )
@@ -139,10 +172,14 @@ export function FilterSidebar({
         </div>
       ) : null}
 
-      <p className="hint">Líneas de color: trazado GTFS. OpenRailwayMap muestra el resto de vías.</p>
+      <p className="hint">
+        {network === "metro"
+          ? "Cada línea lleva el color publicado por el CRTM. Las estaciones son los puntos blancos."
+          : "Líneas de color: trazado GTFS. Las estaciones aparecen al acercar el mapa. OpenRailwayMap queda muy tenue."}
+      </p>
       {linesError ? <p className="hint">{linesError}</p> : null}
 
-      {nuclei.length > 0 ? (
+      {network === "renfe" && nuclei.length > 0 ? (
         <GroupFilters
           title="Núcleos"
           groups={nuclei}
@@ -151,7 +188,7 @@ export function FilterSidebar({
           onShowAll={onShowAllNuclei}
         />
       ) : null}
-      {products.length > 0 ? (
+      {network === "renfe" && products.length > 0 ? (
         <GroupFilters
           title="Servicios"
           groups={products}
@@ -161,14 +198,18 @@ export function FilterSidebar({
         />
       ) : null}
 
-      <p className="hint">
-        Madrid lleva el color de cada línea. Los demás núcleos, uno por ciudad. Las vías siguen en segundo plano.
-      </p>
+      {network === "renfe" ? (
+        <p className="hint">
+          Madrid lleva el color de cada línea. Los demás núcleos, uno por ciudad. Las vías siguen en segundo plano.
+        </p>
+      ) : null}
 
+      {network === "renfe" ? (
       <button type="button" className="detail-toggle" aria-pressed={detailed} onClick={onToggleDetail}>
         <span>Detalle del tren</span>
         <span>{detailed ? "Sí" : "No"}</span>
       </button>
+      ) : null}
 
       <button type="button" className="logout" onClick={onLogout}>
         Salir

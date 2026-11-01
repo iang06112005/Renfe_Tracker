@@ -7,7 +7,7 @@ export interface RouteLineFeature {
   properties: {
     line: string | null
     color: string
-    service: "cercanias" | "ld"
+    service: "cercanias" | "ld" | "metro"
     shapeId: string
   }
 }

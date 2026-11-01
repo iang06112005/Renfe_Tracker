@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from "react"
 
 import { fetchRouteLines } from "../services/lines"
 import { EMPTY_LINES, type RouteLineCollection } from "../types/lines"
-import type { FeedType } from "../types/trains"
 import { AuthError } from "../services/trains"
 
-export function useRouteLines(feed: FeedType, onUnauthorized: () => void) {
+export function useRouteLines(feed: string, onUnauthorized: () => void) {
   const [data, setData] = useState<RouteLineCollection>(EMPTY_LINES)
   const [error, setError] = useState<string | null>(null)
   const onUnauthorizedRef = useRef(onUnauthorized)

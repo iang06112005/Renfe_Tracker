@@ -5,6 +5,7 @@ CERCANIAS_URL = "https://gtfsrt.renfe.com/vehicle_positions.json"
 LD_URL = "https://gtfsrt.renfe.com/vehicle_positions_LD.json"
 CERCANIAS_GTFS_URL = "https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip"
 LD_GTFS_URL = "https://ssl.renfe.com/gtransit/Fichero_AV_LD/google_transit.zip"
+METRO_GTFS_URL = "https://crtm.maps.arcgis.com/sharing/rest/content/items/5c7f2951962540d69ffe8f640d94c246/data"
 CACHE_TTL_SECONDS = 15
 GTFS_CACHE_SECONDS = 24 * 60 * 60
 HTTP_TIMEOUT_SECONDS = 10.0

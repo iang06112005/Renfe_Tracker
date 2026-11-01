@@ -138,10 +138,24 @@ def test_health_login_and_live_trains() -> None:
         ld_lines = client.get("/api/lines?type=ld")
         assert ld_lines.status_code == 200
         assert ld_lines.json()["type"] == "FeatureCollection"
+        metro_lines = client.get("/api/lines?type=metro")
+        assert metro_lines.status_code == 200
+        metro_body = metro_lines.json()
+        assert metro_body["type"] == "FeatureCollection"
+        if metro_body["features"]:
+            assert metro_body["features"][0]["properties"]["service"] == "metro"
+            assert metro_body["features"][0]["properties"]["line"]
+            assert str(metro_body["features"][0]["properties"]["color"]).startswith("#")
+        metro_stops = client.get("/api/stops?type=metro")
+        assert metro_stops.status_code == 200
+        assert metro_stops.json()["type"] == "FeatureCollection"
+        assert client.get("/api/stops?type=nope").status_code == 422
+        assert client.get("/api/lines?type=nope").status_code == 422
 
         assert client.post("/api/logout").status_code == 200
         assert client.get("/api/trains").status_code == 401
         assert client.get("/api/lines").status_code == 401
+        assert client.get("/api/stops").status_code == 401
         assert client.get("/api/session").json() == {"authenticated": False}
 
 
