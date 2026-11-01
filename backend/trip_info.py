@@ -459,14 +459,15 @@ def _close_connection() -> None:
 
 
 def _put_stop(fields: dict[str, str], key: str, call: Call, clock_value: str | None) -> None:
-    if not call.name:
+    name = _stop_label(call.name)
+    if not name:
         return
     clock = _clock(clock_value)
-    fields[key] = f"{call.name} · {clock}" if clock else call.name
+    fields[key] = f"{name} · {clock}" if clock else name
 
 
 def _route_label(route_long: str | None, calls: list[tuple[str, Call]]) -> str | None:
-    names = [call.name for _stop, call in calls if call.name]
+    names = [label for _stop, call in calls if (label := _stop_label(call.name))]
     if len(names) >= 2 and names[0] != names[-1]:
         return f"{names[0]} – {names[-1]}"
     return _clean_route(route_long)
@@ -475,15 +476,30 @@ def _route_label(route_long: str | None, calls: list[tuple[str, Call]]) -> str |
 def _clock(value: str | None) -> str | None:
     if not value:
         return None
-    parts = value.split(":")
-    if len(parts) < 2:
+    text = value.strip()
+    match = re.fullmatch(r"(\d{1,2}):([0-5]\d)(?::([0-5]\d))?", text)
+    if not match:
         return None
-    try:
-        hour = int(parts[0])
-        minute = int(parts[1])
-    except ValueError:
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    # GTFS may use 24–47 for times after midnight; anything beyond that is junk.
+    if hour > 47:
         return None
     return f"{hour % 24:02d}:{minute:02d}"
+
+
+def _stop_label(value: str | None) -> str | None:
+    text = _clean(value)
+    if not text or len(text) < 2:
+        return None
+    # Prefer omitting fragments that look truncated or unfinished.
+    if text.endswith((" -", " –", "/", "-")):
+        return None
+    if re.search(r"\s[A-Za-zÁÉÍÓÚÜáéíóúü]$", text):
+        return None
+    if re.fullmatch(r"[A-Za-zÁÉÍÓÚÜáéíóúü]{1,3}", text) and text.lower() in _GENERIC_TOKENS:
+        return None
+    return text
 
 
 def _clean(value: str | None) -> str | None:

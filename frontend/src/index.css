@@ -272,11 +272,23 @@ button:focus-visible, input:focus-visible {
 
 .popup dl { margin: 10px 0 0; }
 
-.popup div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.popup div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+  font-size: 13px;
+}
 
 .popup dt { color: var(--muted); }
 
-.popup dd { margin: 0; font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.popup dd {
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  text-align: right;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .popup-close {
   position: absolute;

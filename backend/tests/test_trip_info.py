@@ -226,3 +226,17 @@ def test_hours_past_midnight_stay_on_the_clock() -> None:
     calls = [("A", Call("Lora del Río", "25:10:00", "25:12:00"))]
     fields = describe_train(line="C1", product=None, route_long=None, status="IN_TRANSIT_TO", stop_id="A", calls=calls)
     assert fields["nextStop"] == "Lora del Río · 01:10"
+
+
+def test_garbage_clock_and_truncated_names_are_omitted() -> None:
+    calls = [
+        ("A", Call("margaritas a", "25 y son y media", None)),
+        ("B", Call("Brenes", "no-hora", "11:56:00")),
+        ("C", Call("Sevilla-Santa Justa", "99:10:00", "99:12:00")),
+    ]
+    bad_name = describe_train(line="C1", product=None, route_long=None, status="IN_TRANSIT_TO", stop_id="A", calls=calls)
+    assert "nextStop" not in bad_name
+    bad_clock = describe_train(line="C1", product=None, route_long=None, status="IN_TRANSIT_TO", stop_id="B", calls=calls)
+    assert bad_clock["nextStop"] == "Brenes"
+    absurd_hour = describe_train(line="C1", product=None, route_long=None, status="IN_TRANSIT_TO", stop_id="C", calls=calls)
+    assert absurd_hour["nextStop"] == "Sevilla-Santa Justa"

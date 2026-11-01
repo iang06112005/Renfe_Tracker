@@ -89,10 +89,10 @@ function Detail({ properties, status }: { properties: TrainFeature["properties"]
   const rows = [
     ["Producto", properties.product && properties.product !== properties.line ? properties.product : null],
     ["Núcleo", nucleusText(properties.nucleus, properties.nucleusLabel)],
-    ["Recorrido", properties.route],
-    ["Anterior", properties.previousStop],
-    ["En parada", properties.currentStop],
-    ["Siguiente", properties.nextStop],
+    ["Recorrido", cleanText(properties.route)],
+    ["Anterior", cleanStopField(properties.previousStop)],
+    ["En parada", cleanStopField(properties.currentStop)],
+    ["Siguiente", cleanStopField(properties.nextStop)],
     ["Tren", properties.vehicleId],
     ["Andén", properties.platform],
     ["Estado", status === "Sin estado" ? null : status],
@@ -125,6 +125,32 @@ function placePopup(y: number, detailed: boolean): { top: number; below: boolean
 function nucleusText(code: string | null, label: string | null): string | null {
   if (label && code) return `${code} · ${label}`
   return label ?? code
+}
+
+function cleanStopField(value: string | null): string | null {
+  if (!value) return null
+  const text = value.trim()
+  if (text.length < 2) return null
+  const separator = " · "
+  if (!text.includes(separator)) return looksTruncated(text) ? null : text
+  const index = text.lastIndexOf(separator)
+  const name = text.slice(0, index).trim()
+  const clock = text.slice(index + separator.length).trim()
+  if (looksTruncated(name)) return null
+  if (!/^\d{2}:\d{2}$/.test(clock)) return name.length >= 2 ? name : null
+  return `${name}${separator}${clock}`
+}
+
+function cleanText(value: string | null): string | null {
+  if (!value) return null
+  const text = value.trim()
+  return text.length >= 2 && !looksTruncated(text) ? text : null
+}
+
+function looksTruncated(value: string): boolean {
+  if (/\s[A-Za-zÁÉÍÓÚÜáéíóúü]$/.test(value)) return true
+  if (/[-\/–]\s*$/.test(value)) return true
+  return false
 }
 
 function formatTimestamp(timestamp: number | null): string {
