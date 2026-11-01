@@ -9,7 +9,6 @@ const RAIL_TILES = ["https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png"]
 const RAIL_SOURCE = "openrailwaymap"
 const RAIL_LAYER = "openrailwaymap"
 const ROUTE_SOURCE = "route-lines"
-const ROUTE_CASING = "route-lines-casing"
 const ROUTE_LAYER = "route-lines"
 const SOURCE_ID = "trains"
 const HIT_LAYER = "trains-hit"
@@ -128,6 +127,9 @@ export function MapView({ geojson, routeLines, hiddenLines, selectedId, onSelect
       map.on("mouseleave", HIT_LAYER, () => {
         map.getCanvas().style.cursor = ""
       })
+      for (const layerId of [HIT_LAYER, CIRCLE_LAYER, HIGHLIGHT_LAYER, LABEL_LAYER]) {
+        if (map.getLayer(layerId)) map.moveLayer(layerId)
+      }
       applyPadding()
       onReadyRef.current(map)
       setReady(true)
@@ -178,7 +180,14 @@ function addRailNetwork(map: MapLibreMap) {
     id: RAIL_LAYER,
     type: "raster",
     source: RAIL_SOURCE,
-    paint: { "raster-opacity": 0.95, "raster-fade-duration": 0 },
+    paint: {
+      "raster-opacity": 0.28,
+      "raster-saturation": -0.75,
+      "raster-contrast": -0.25,
+      "raster-brightness-min": 0,
+      "raster-brightness-max": 0.45,
+      "raster-fade-duration": 0,
+    },
   })
 }
 
@@ -188,25 +197,15 @@ function addRouteLines(map: MapLibreMap) {
     data: { type: "FeatureCollection", features: [] },
   })
   map.addLayer({
-    id: ROUTE_CASING,
-    type: "line",
-    source: ROUTE_SOURCE,
-    layout: { "line-join": "round", "line-cap": "round" },
-    paint: {
-      "line-color": "#0c0d0b",
-      "line-opacity": 0.8,
-      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2.4, 10, 6],
-    },
-  })
-  map.addLayer({
     id: ROUTE_LAYER,
     type: "line",
     source: ROUTE_SOURCE,
     layout: { "line-join": "round", "line-cap": "round" },
     paint: {
-      "line-color": ["coalesce", ["get", "color"], "#f3efe4"],
-      "line-opacity": 0.92,
-      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.2, 10, 3.2],
+      "line-color": ["coalesce", ["get", "color"], "#8d8a82"],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.32, 8, 0.48, 12, 0.6],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.6, 8, 1.1, 13, 1.8],
+      "line-blur": 0.2,
     },
   })
 }
