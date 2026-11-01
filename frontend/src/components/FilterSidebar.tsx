@@ -17,6 +17,8 @@ interface FilterSidebarProps {
   loading: boolean
   error: string | null
   linesError: string | null
+  detailed: boolean
+  onToggleDetail: () => void
   onLogout: () => void
 }
 
@@ -40,6 +42,8 @@ export function FilterSidebar({
   loading,
   error,
   linesError,
+  detailed,
+  onToggleDetail,
   onLogout,
 }: FilterSidebarProps) {
   const [now, setNow] = useState(() => Date.now())
@@ -124,6 +128,11 @@ export function FilterSidebar({
           <i className="swatch ld" /> {SERVICE_LABEL.ld}
         </li>
       </ul>
+
+      <button type="button" className="detail-toggle" aria-pressed={detailed} onClick={onToggleDetail}>
+        <span>Detalle del tren</span>
+        <span>{detailed ? "Sí" : "No"}</span>
+      </button>
 
       <button type="button" className="logout" onClick={onLogout}>
         Salir

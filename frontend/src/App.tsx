@@ -29,6 +29,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
   const [feed, setFeed] = useState<FeedType>("all")
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(() => new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detailed, setDetailed] = useState(true)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { data, error, updatedAt, loading } = useTrainsData(feed, onUnauthorized)
   const routeLines = useRouteLines(feed, onUnauthorized)
@@ -64,7 +65,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
         onSelect={setSelectedId}
         onReady={setMap}
       />
-      <TrainPopup map={map} train={selected} onClose={closePopup} />
+      <TrainPopup map={map} train={selected} detailed={detailed} onClose={closePopup} />
       <FilterSidebar
         feed={feed}
         onFeedChange={changeFeed}
@@ -79,6 +80,8 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
         loading={loading}
         error={error}
         linesError={routeLines.error}
+        detailed={detailed}
+        onToggleDetail={() => setDetailed((current) => !current)}
         onLogout={onLogout}
       />
     </div>

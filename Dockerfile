@@ -13,7 +13,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --uid 10001 --user-group --create-home app
-COPY backend/config.py backend/schemas.py backend/renfe_client.py backend/parser.py backend/gtfs_shapes.py backend/main.py backend/
+COPY backend/config.py backend/schemas.py backend/renfe_client.py backend/parser.py backend/gtfs_shapes.py backend/trip_info.py backend/main.py backend/
 COPY --from=frontend /src/dist ./frontend/dist
 RUN mkdir -p /app/data/gtfs && chown -R app:app /app/data
 USER app

@@ -206,10 +206,25 @@ button:focus-visible, input:focus-visible {
 
 .logout:hover, .chip:hover, .segment button:hover { border-color: var(--text); }
 
+.detail-toggle {
+  width: 100%;
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.detail-toggle[aria-pressed="true"] {
+  border-color: var(--text);
+}
+
 .popup {
   position: absolute;
   z-index: 3;
-  width: min(240px, calc(100% - 24px));
+  width: min(280px, calc(100% - 24px));
   padding: 12px 28px 12px 12px;
   background: var(--panel);
   border: 1px solid var(--line);

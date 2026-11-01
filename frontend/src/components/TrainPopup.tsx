@@ -6,6 +6,7 @@ import { SERVICE_LABEL, type TrainFeature } from "../types/trains"
 interface TrainPopupProps {
   map: MapLibreMap | null
   train: TrainFeature | null
+  detailed: boolean
   onClose: () => void
 }
 
@@ -15,7 +16,7 @@ const STATUS_LABEL: Record<string, string> = {
   INCOMING_AT: "Llegando",
 }
 
-export function TrainPopup({ map, train, onClose }: TrainPopupProps) {
+export function TrainPopup({ map, train, detailed, onClose }: TrainPopupProps) {
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
   const lng = train?.geometry.coordinates[0]
   const lat = train?.geometry.coordinates[1]
@@ -48,8 +49,8 @@ export function TrainPopup({ map, train, onClose }: TrainPopupProps) {
 
   const title = train.properties.line ?? train.properties.vehicleId ?? train.properties.id
   const status = train.properties.status ? (STATUS_LABEL[train.properties.status] ?? train.properties.status) : "Sin estado"
-  const flip = point.y < 180
-  const half = Math.min(120, window.innerWidth / 2 - 16)
+  const flip = point.y < (detailed ? 320 : 160)
+  const half = Math.min(140, window.innerWidth / 2 - 16)
   const left = Math.min(window.innerWidth - half - 12, Math.max(half + 12, point.x))
 
   return (
@@ -66,31 +67,35 @@ export function TrainPopup({ map, train, onClose }: TrainPopupProps) {
       <button type="button" className="popup-close" onClick={onClose} aria-label="Cerrar">
         ×
       </button>
-      <p className={`popup-kicker ${train.properties.service}`}>{SERVICE_LABEL[train.properties.service]}</p>
+      {detailed ? <p className={`popup-kicker ${train.properties.service}`}>{SERVICE_LABEL[train.properties.service]}</p> : null}
       <h2>{title}</h2>
-      <dl>
-        <div>
-          <dt>Tren</dt>
-          <dd>{train.properties.vehicleId ?? "—"}</dd>
-        </div>
-        <div>
-          <dt>Andén</dt>
-          <dd>{train.properties.platform ?? "—"}</dd>
-        </div>
-        <div>
-          <dt>Estado</dt>
-          <dd>{status}</dd>
-        </div>
-        <div>
-          <dt>Parada</dt>
-          <dd>{train.properties.stopId ?? "—"}</dd>
-        </div>
-        <div>
-          <dt>Hora</dt>
-          <dd>{formatTimestamp(train.properties.timestamp)}</dd>
-        </div>
-      </dl>
+      {detailed ? <Detail properties={train.properties} status={status} /> : null}
     </div>
+  )
+}
+
+function Detail({ properties, status }: { properties: TrainFeature["properties"]; status: string }) {
+  const rows = [
+    ["Servicio", properties.product],
+    ["Recorrido", properties.route],
+    ["Anterior", properties.previousStop],
+    ["En parada", properties.currentStop],
+    ["Siguiente", properties.nextStop],
+    ["Tren", properties.vehicleId],
+    ["Andén", properties.platform],
+    ["Estado", status === "Sin estado" ? null : status],
+    ["Posición", formatTimestamp(properties.timestamp)],
+  ].filter((row): row is [string, string] => typeof row[1] === "string" && row[1] !== "—")
+  if (rows.length === 0) return null
+  return (
+    <dl>
+      {rows.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

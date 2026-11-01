@@ -23,6 +23,7 @@ from config import (
 from gtfs_shapes import ShapeLoadError, ShapeStore
 from parser import parse_feed
 from renfe_client import RenfeClient, RenfeUnavailable
+from trip_info import lookup as lookup_trip
 from schemas import (
     FeatureCollection,
     FeedType,
@@ -193,7 +194,20 @@ async def _features(client: RenfeClient, kind: ServiceKind) -> list[TrainFeature
     except RenfeUnavailable:
         logger.warning("Sin datos de Renfe para %s", kind)
         return None
-    return parse_feed(payload, kind).features
+    return [_with_trip_context(feature) for feature in parse_feed(payload, kind).features]
+
+
+def _with_trip_context(feature: TrainFeature) -> TrainFeature:
+    extra = lookup_trip(
+        feature.properties.service,
+        feature.properties.tripId,
+        feature.properties.stopId,
+        feature.properties.status,
+        feature.properties.line,
+    )
+    if not extra:
+        return feature
+    return feature.model_copy(update={"properties": feature.properties.model_copy(update=extra)})
 
 
 def _safe_asset(full_path: str) -> Path | None:

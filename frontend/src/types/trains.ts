@@ -12,6 +12,11 @@ export interface TrainProperties {
   status: string | null
   timestamp: number | null
   service: ServiceKind
+  product: string | null
+  route: string | null
+  previousStop: string | null
+  nextStop: string | null
+  currentStop: string | null
 }
 
 export interface TrainFeature {

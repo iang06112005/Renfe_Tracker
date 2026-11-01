@@ -64,6 +64,18 @@ _GUARD = asyncio.Lock()
 
 
 def load_route_lines() -> dict[str, bytes]:
+    try:
+        return _route_line_bodies()
+    finally:
+        try:
+            from trip_info import ensure_trip_index
+
+            ensure_trip_index()
+        except Exception:
+            logger.exception("No se pudo indexar paradas y horarios")
+
+
+def _route_line_bodies() -> dict[str, bytes]:
     cached = _read_cache()
     if cached is not None and _fresh(CACHE_FILE):
         return _encode(cached["collections"])

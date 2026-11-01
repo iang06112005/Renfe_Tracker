@@ -71,6 +71,11 @@ function readProperties(record: Record<string, unknown>, id: string, service: Se
     status: readString(record.status),
     timestamp: typeof record.timestamp === "number" ? record.timestamp : null,
     service,
+    product: readString(record.product),
+    route: readString(record.route),
+    previousStop: readString(record.previousStop),
+    nextStop: readString(record.nextStop),
+    currentStop: readString(record.currentStop),
   }
 }
 
