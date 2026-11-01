@@ -54,7 +54,7 @@ function Tracker({ onLogout, onUnauthorized }: { onLogout: () => void; onUnautho
     () => (metro ? shapeLines(routeLines.data) : uniqueLines(data)),
     [metro, routeLines.data, data],
   )
-  const lineColors = useMemo(() => shapeColors(routeLines.data, metro), [metro, routeLines.data])
+  const lineColors = useMemo(() => shapeColors(routeLines.data), [routeLines.data])
   const counts = useMemo(() => countServices(data), [data])
   const closePopup = useCallback(() => setSelectedId(null), [])
 
@@ -215,7 +215,7 @@ function shapeLines(data: RouteLineCollection): string[] {
   return [...lines].sort((a, b) => a.localeCompare(b, "es", { numeric: true }))
 }
 
-function shapeColors(data: RouteLineCollection, allowMixed: boolean): Record<string, string> {
+function shapeColors(data: RouteLineCollection): Record<string, string> {
   const madrid = new Map<string, string>()
   const counts = new Map<string, Map<string, number>>()
   for (const feature of data.features) {
@@ -229,13 +229,8 @@ function shapeColors(data: RouteLineCollection, allowMixed: boolean): Record<str
   }
   const result: Record<string, string> = {}
   for (const [line, tallies] of counts) {
-    if (madrid.has(line)) {
-      result[line] = madrid.get(line)!
-      continue
-    }
-    if (allowMixed || tallies.size === 1) {
-      result[line] = [...tallies.entries()].sort((a, b) => b[1] - a[1])[0][0]
-    }
+    result[line] =
+      madrid.get(line) ?? [...tallies.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0]
   }
   return result
 }
