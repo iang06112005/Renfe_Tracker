@@ -89,8 +89,7 @@ class MetroVehicleStore:
                 headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
                 follow_redirects=True,
             )
-        if self._topology is None:
-            self._topology = await asyncio.to_thread(load_metro_topology)
+        await self._ensure_topology()
 
     async def aclose(self) -> None:
         if self._owns_client and self._client is not None:
@@ -98,6 +97,9 @@ class MetroVehicleStore:
             self._client = None
 
     async def vehicles(self) -> FeatureCollection:
+        await self._ensure_topology()
+        if self._topology is None:
+            raise MetroUnavailable
         reserved = await self._reserve()
         if not isinstance(reserved, asyncio.Task):
             return reserved
@@ -112,6 +114,15 @@ class MetroVehicleStore:
             raise MetroUnavailable from exc
         await self._remember(reserved, payload)
         return payload
+
+    async def _ensure_topology(self) -> None:
+        if self._topology is not None:
+            return
+        try:
+            self._topology = await asyncio.to_thread(load_metro_topology)
+        except (OSError, FileNotFoundError, zipfile.BadZipFile, KeyError, ValueError) as exc:
+            logger.warning("Topología de Metro no lista aún (%s)", exc.__class__.__name__)
+            self._topology = None
 
     async def _reserve(self) -> FeatureCollection | asyncio.Task[FeatureCollection]:
         async with self._lock:
