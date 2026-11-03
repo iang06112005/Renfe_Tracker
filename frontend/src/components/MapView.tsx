@@ -99,9 +99,10 @@ export function MapView({
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 4.5, 4, 8, 5.4, 12, 7.2],
           "circle-color": [
-            "coalesce",
+            "case",
+            ["all", ["has", "groupColor"], ["!=", ["get", "groupColor"], null], ["!=", ["get", "groupColor"], ""]],
             ["get", "groupColor"],
-            ["match", ["get", "service"], "cercanias", "#e10600", "#c8c2b4"],
+            ["match", ["get", "service"], "cercanias", "#e10600", "metro", "#005aa9", "#c8c2b4"],
           ],
           "circle-stroke-width": 1.4,
           "circle-stroke-color": "#1c1917",

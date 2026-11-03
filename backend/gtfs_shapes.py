@@ -65,6 +65,7 @@ class ShapeStore:
                     logger.warning("Trazados vacíos; se reintentará en 60 s")
                 else:
                     self._retry_after = 0.0
+                    asyncio.create_task(asyncio.to_thread(_safe_ensure_trip_index))
             if self._extra is None:
                 try:
                     from transit_layers import load_transit_layers
@@ -101,16 +102,20 @@ _EMPTY_GEOJSON = b'{"type":"FeatureCollection","features":[]}'
 _GUARD = asyncio.Lock()
 
 
-def load_route_lines() -> dict[str, bytes]:
-    try:
-        return _route_line_bodies()
-    finally:
-        try:
-            from trip_info import ensure_trip_index
 
-            ensure_trip_index()
-        except Exception:
-            logger.exception("No se pudo indexar paradas y horarios")
+def _safe_ensure_trip_index() -> None:
+    try:
+        from trip_info import ensure_trip_index
+
+        ensure_trip_index()
+    except Exception:
+        logger.exception("No se pudo indexar paradas y horarios")
+
+
+def load_route_lines() -> dict[str, bytes]:
+    # Keep trip indexing out of this path: building stop_times on a small
+    # Fly VM can OOM and would otherwise wipe a successful shapes load.
+    return _route_line_bodies()
 
 
 def _route_line_bodies() -> dict[str, bytes]:
@@ -210,7 +215,7 @@ def _open_feed_zip(service: str, url: str) -> zipfile.ZipFile:
 
 
 def _download(url: str, path: Path) -> None:
-    timeout = httpx.Timeout(60.0, connect=10.0)
+    timeout = httpx.Timeout(120.0, connect=15.0)
     headers = {"User-Agent": USER_AGENT, "Accept": "application/zip"}
     temporary = path.with_suffix(".zip.part")
     with httpx.Client(timeout=timeout, headers=headers, follow_redirects=True) as client:

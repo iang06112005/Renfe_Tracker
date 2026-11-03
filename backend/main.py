@@ -25,6 +25,7 @@ from metro_vehicles import MetroUnavailable, MetroVehicleStore
 from parser import parse_feed
 from renfe_client import RenfeClient, RenfeUnavailable
 from trip_info import lookup as lookup_trip
+from trip_info import madrid_line_color, product_bucket, product_color
 from trip_updates import TripUpdateInfo, enrich_with_trip_update, parse_trip_updates
 from schemas import (
     FeatureCollection,
@@ -34,6 +35,7 @@ from schemas import (
     RenfeKind,
     SessionResponse,
     TrainFeature,
+    TrainProperties,
 )
 
 logger = logging.getLogger("renfe_tracker")
@@ -258,9 +260,36 @@ def _with_trip_context(feature: TrainFeature, updates: dict[str, TripUpdateInfo]
         status=feature.properties.status,
         update=update,
     )
-    if not merged:
+    props = feature.properties.model_copy(update=merged) if merged else feature.properties
+    if not props.groupColor:
+        props = props.model_copy(update=_fallback_group_color(props))
+    if props is feature.properties:
         return feature
-    return feature.model_copy(update={"properties": feature.properties.model_copy(update=merged)})
+    return feature.model_copy(update={"properties": props})
+
+
+def _fallback_group_color(props: TrainProperties) -> dict[str, str]:
+    if props.service == "metro":
+        return {}
+    if props.service == "cercanias":
+        color = madrid_line_color(props.line) or "#e10600"
+        return {
+            "groupColor": color,
+            "bucket": props.bucket or "cercanias",
+            "bucketLabel": props.bucketLabel or "Cercanías",
+            "bucketColor": props.bucketColor or "#e10600",
+        }
+    bucket = props.bucket or product_bucket(props.product or props.line)
+    if not bucket:
+        return {"groupColor": "#c8c2b4"}
+    color = props.bucketColor or product_color(props.product or props.line or bucket)
+    labels = {"alta": "Alta velocidad", "media": "Media distancia", "larga": "Larga distancia"}
+    return {
+        "groupColor": color,
+        "bucket": bucket,
+        "bucketLabel": props.bucketLabel or labels.get(bucket, bucket),
+        "bucketColor": color,
+    }
 
 
 def _safe_asset(full_path: str) -> Path | None:

@@ -243,26 +243,69 @@ def ensure_trip_index() -> None:
             );
             """
         )
+        # Core index first (colors / nuclei / products). stop_times is huge and can
+        # OOM a 256–512 MB Fly VM; publish the core DB before attempting calls.
         for service, path in zips:
             if path.is_file():
-                _fill(connection, service, path)
-        connection.execute("CREATE INDEX idx_call_trip ON call (service, trip_id, seq)")
+                _fill_core(connection, service, path)
         connection.commit()
     finally:
         connection.close()
     temporary.replace(INDEX_PATH)
     with _LOCK:
         _close_connection()
+    try:
+        _append_calls(zips)
+    except Exception:
+        import logging
+
+        logging.getLogger("renfe_tracker.trip_info").exception(
+            "Índice de horarios (stop_times) omitido; colores siguen disponibles"
+        )
 
 
-def _fill(connection: sqlite3.Connection, service: ServiceKind, path: Path) -> None:
+def _fill_core(connection: sqlite3.Connection, service: ServiceKind, path: Path) -> None:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         if "stops.txt" in names:
             _insert_stops(connection, service, archive)
         if "trips.txt" in names and "routes.txt" in names:
             _insert_trips(connection, service, archive)
-        if "stop_times.txt" in names:
+
+
+def _append_calls(zips: list[tuple[ServiceKind, Path]]) -> None:
+    """Merge stop_times into a copy of the core index so an OOM cannot wipe colors."""
+    import shutil
+
+    if not INDEX_PATH.is_file():
+        return
+    staging = INDEX_PATH.with_suffix(".sqlite.calls")
+    if staging.exists():
+        staging.unlink()
+    shutil.copy2(INDEX_PATH, staging)
+    connection = sqlite3.connect(staging)
+    try:
+        connection.execute("PRAGMA journal_mode=OFF")
+        connection.execute("PRAGMA synchronous=OFF")
+        for service, path in zips:
+            if not path.is_file():
+                continue
+            with zipfile.ZipFile(path) as archive:
+                if "stop_times.txt" in archive.namelist():
+                    _insert_calls(connection, service, archive)
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_call_trip ON call (service, trip_id, seq)")
+        connection.commit()
+    finally:
+        connection.close()
+    staging.replace(INDEX_PATH)
+    with _LOCK:
+        _close_connection()
+
+
+def _fill(connection: sqlite3.Connection, service: ServiceKind, path: Path) -> None:
+    _fill_core(connection, service, path)
+    with zipfile.ZipFile(path) as archive:
+        if "stop_times.txt" in archive.namelist():
             _insert_calls(connection, service, archive)
 
 
